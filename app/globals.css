@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surfaces papier chaudes (design TaskManager) */
+    --background: 40 20% 97%;
+    --foreground: 30 8% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 8% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 8% 13%;
+
+    /* Primary — bleu-pétrole désaturé */
+    --primary: 186 24% 33%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 185 22% 40%;
+
+    /* Secondary — gris surface clair */
+    --secondary: 40 12% 93%;
+    --secondary-foreground: 30 8% 16%;
+
+    /* Muted */
+    --muted: 40 15% 92%;
+    --muted-foreground: 42 6% 40%;
+
+    /* Accent — pétrole plus clair (même famille) */
+    --accent: 186 23% 27%;
+    --accent-foreground: 0 0% 96%;
+
+    /* Semantic (palette statue TaskManager) */
+    --success: 150 33% 37%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 57% 42%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 4 40% 49%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 202 29% 41%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 40 12% 85%;
+    --input: 40 12% 82%;
+    --ring: 186 24% 33%;
+
+    /* Chart palette pétrole */
+    --chart-1: 186 24% 33%;
+    --chart-2: 150 33% 37%;
+    --chart-3: 36 57% 42%;
+    --chart-4: 4 40% 49%;
+    --chart-5: 257 19% 47%;
+
+    --radius: 0.5rem;
+
+    --sidebar: 40 25% 99%;
+    --sidebar-foreground: 30 8% 18%;
+  }
+
+  .dark {
+    --background: 210 30% 8%;
+    --foreground: 187 20% 92%;
+    --card: 210 26% 11%;
+    --card-foreground: 187 20% 92%;
+    --popover: 210 26% 11%;
+    --popover-foreground: 187 20% 92%;
+
+    /* Primary — pétrole éclairci pour lisibilité sur fond sombre */
+    --primary: 186 24% 46%;
+    --primary-foreground: 210 30% 8%;
+    --primary-light: 185 22% 54%;
+
+    --secondary: 208 24% 16%;
+    --secondary-foreground: 187 20% 92%;
+
+    --muted: 208 24% 16%;
+    --muted-foreground: 187 12% 62%;
+
+    --accent: 186 23% 42%;
+    --accent-foreground: 210 30% 8%;
+
+    --success: 150 33% 46%;
+    --success-foreground: 210 30% 8%;
+    --warning: 36 57% 55%;
+    --warning-foreground: 210 30% 8%;
+    --destructive: 4 40% 58%;
+    --destructive-foreground: 210 30% 8%;
+    --info: 202 29% 55%;
+    --info-foreground: 210 30% 8%;
+
+    --border: 208 24% 20%;
+    --input: 208 24% 20%;
+    --ring: 186 24% 46%;
+
+    --chart-1: 186 24% 46%;
+    --chart-2: 150 33% 46%;
+    --chart-3: 36 57% 55%;
+    --chart-4: 4 40% 58%;
+    --chart-5: 257 19% 58%;
+
+    --sidebar: 210 30% 7%;
+    --sidebar-foreground: 187 20% 92%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+  input, textarea, [contenteditable="true"], [role="textbox"], select {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  .glass {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
