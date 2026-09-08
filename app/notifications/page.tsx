@@ -17,13 +17,14 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   project_validated: '✅',
   project_rejected: '❌',
   subtask_assigned: '📌',
-  new_message: '💬',
   delay_detected: '⏰',
   project_completed: '🎉',
   modification_requested: '📝',
   modification_reviewed: '🔍',
   member_added: '👥',
   subtask_reviewed: '✅',
+  member_created: '👤',
+  calendar_event: '📅',
 };
 
 export default function NotificationsPage() {

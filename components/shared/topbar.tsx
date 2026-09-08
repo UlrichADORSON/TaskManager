@@ -17,13 +17,14 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   project_validated: '✅',
   project_rejected: '❌',
   subtask_assigned: '📌',
-  new_message: '💬',
   delay_detected: '⏰',
   project_completed: '🎉',
   modification_requested: '📝',
   modification_reviewed: '🔍',
   member_added: '👥',
   subtask_reviewed: '✅',
+  member_created: '👤',
+  calendar_event: '📅',
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -59,7 +60,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   // Search across all projects the user can see
   const visibleProjects = projects.filter((p) => {
     if (currentUser.role === 'admin') return true;
-    if (currentUser.role === 'manager') return p.managerId === currentUser.id || p.status !== 'rejected';
+    if (currentUser.role === 'chef_de_projet') return p.managerId === currentUser.id || p.status !== 'rejected';
     if (currentUser.role === 'client') return p.clientId === currentUser.id;
     return p.members.some((m) => m.userId === currentUser.id);
   });

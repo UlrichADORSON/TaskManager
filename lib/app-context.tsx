@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type {
-  User, Project, AppNotification, Subtask, Message, SubtaskStatus,
-  ProjectStatus, Channel, Attachment, ModificationRequest, ModificationStatus,
-  ModificationTarget,
+  User, Project, AppNotification, Subtask, SubtaskStatus,
+  ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
+  ModificationTarget, Role, CalendarEvent, MemberSpecialty,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -18,6 +18,10 @@ interface SubmitProjectData {
   endDate: string;
   logoUrl?: string;
   attachments?: Attachment[];
+  platformUsers?: string;
+  desiredFeatures?: string;
+  necessaryPages?: string;
+  plannedFeatures?: string;
 }
 
 interface SuggestModificationData {
@@ -44,18 +48,20 @@ interface AppState {
   validateProject: (projectId: string) => void;
   rejectProject: (projectId: string, reason: string) => void;
   assignManager: (projectId: string, managerId: string) => void;
-  addProjectMember: (projectId: string, employeeId: string) => void;
+  addProjectMember: (projectId: string, data: { userId: string; role: Role }) => void;
   removeProjectMember: (projectId: string, userId: string) => void;
-  addSubtask: (projectId: string, data: Omit<Subtask, 'id' | 'projectId' | 'progress' | 'attachments' | 'createdAt' | 'isActive' | 'activeSessions'>) => void;
+  addSubtask: (projectId: string, data: Omit<Subtask, 'id' | 'projectId' | 'progress' | 'attachments' | 'comments' | 'createdAt'>) => void;
   updateSubtaskStatus: (projectId: string, subtaskId: string, status: SubtaskStatus) => void;
   approveSubtask: (projectId: string, subtaskId: string) => void;
   assignSubtask: (projectId: string, subtaskId: string, employeeId: string | null) => void;
   toggleTaskActive: (projectId: string, subtaskId: string) => void;
   suggestModification: (data: SuggestModificationData) => void;
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
-  sendMessage: (channelId: string, content: string, attachments?: Attachment[]) => void;
-  addEmployee: (data: { name: string; email: string; jobTitle: string; phone: string; role: 'employee' | 'manager'; avatarUrl?: string; availability?: 'available' | 'busy' | 'unavailable'; company?: string; address?: string; bio?: string }) => void;
-  updateProfile: (data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; jobTitle?: string; avatarUrl?: string }) => void;
+  addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
+  scheduleClientMeeting: (projectId: string, data: { date: string; note: string }) => void;
+  addEmployee: (data: { name: string; email: string; password: string; phone: string; role: 'chef_de_projet' | 'membre'; memberSpecialty?: MemberSpecialty; avatarUrl?: string; company?: string; address?: string; bio?: string }) => void;
+  updateUser: (userId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; role?: Role; memberSpecialty?: MemberSpecialty; password?: string; avatarUrl?: string }) => void;
+  updateProfile: (data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; memberSpecialty?: MemberSpecialty; avatarUrl?: string }) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
 }
@@ -77,7 +83,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
 
-  // Restore session from localStorage (frontend-only persistence)
   useEffect(() => {
     try {
       const id = window.localStorage.getItem(SESSION_KEY);
@@ -86,7 +91,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (user) setCurrentUser(user);
       }
     } catch {
-      // storage unavailable (private mode, etc.)
+      // storage unavailable
     } finally {
       setSessionInitialized(true);
     }
@@ -102,7 +107,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(SESSION_KEY, user.id);
     } catch {
-      // ignore storage errors
+      // ignore
     }
     return true;
   }, [users]);
@@ -112,7 +117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.removeItem(SESSION_KEY);
     } catch {
-      // ignore storage errors
+      // ignore
     }
   }, []);
 
@@ -136,8 +141,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       members: [{ userId: currentUser?.id ?? 'u-cli-1', role: 'client', joinedAt: new Date().toISOString() }],
       subtasks: [],
       progressTimeline: [],
-      channels: [],
+      calendarEvents: [],
       modifications: [],
+      platformUsers: data.platformUsers,
+      desiredFeatures: data.desiredFeatures,
+      necessaryPages: data.necessaryPages,
+      plannedFeatures: data.plannedFeatures,
+      clientMeeting: null,
       createdAt: new Date().toISOString(),
     };
     setProjects((prev) => [newProject, ...prev]);
@@ -180,7 +190,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...p,
             status: 'assigned' as ProjectStatus,
             managerId,
-            members: [...p.members.filter((m) => m.role !== 'manager'), { userId: managerId, role: 'manager' as const, joinedAt: new Date().toISOString() }],
+            members: [...p.members.filter((m) => m.role !== 'chef_de_projet'), { userId: managerId, role: 'chef_de_projet' as const, joinedAt: new Date().toISOString() }],
           }
         : p
     ));
@@ -191,21 +201,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ---- Member management
-  const addProjectMember: AppState['addProjectMember'] = useCallback((projectId, employeeId) => {
+  const addProjectMember: AppState['addProjectMember'] = useCallback((projectId, data) => {
     setProjects((prev) => prev.map((p) => {
       if (p.id !== projectId) return p;
-      if (p.members.some((m) => m.userId === employeeId)) return p;
-      const emp = users.find((u) => u.id === employeeId);
+      if (p.members.some((m) => m.userId === data.userId)) return p;
       return {
         ...p,
-        members: [...p.members, { userId: employeeId, role: (emp?.role ?? 'employee') as 'employee' | 'manager', joinedAt: new Date().toISOString() }],
+        members: [...p.members, { userId: data.userId, role: data.role, joinedAt: new Date().toISOString() }],
       };
     }));
     setNotifications((prev) => [
-      { id: `n-${Date.now()}`, userId: employeeId, type: 'member_added', title: 'Ajouté à un projet', message: `Vous avez été ajouté à un projet.`, projectId, read: false, createdAt: new Date().toISOString() },
+      { id: `n-${Date.now()}`, userId: data.userId, type: 'member_added', title: 'Ajouté à un projet', message: `Vous avez été ajouté à un projet.`, projectId, read: false, createdAt: new Date().toISOString() },
       ...prev,
     ]);
-  }, [users]);
+  }, []);
 
   const removeProjectMember: AppState['removeProjectMember'] = useCallback((projectId, userId) => {
     setProjects((prev) => prev.map((p) =>
@@ -223,9 +232,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       projectId,
       progress: 0,
       attachments: [],
-      createdAt: new Date().toISOString(),
+      comments: [],
       isActive: false,
-      activeSessions: [],
+      workSessions: [],
+      createdAt: new Date().toISOString(),
     };
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
@@ -234,7 +244,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             status: p.status === 'assigned' ? ('in_progress' as ProjectStatus) : p.status,
             subtasks: [...p.subtasks, newSubtask],
             members: data.assignedToId && !p.members.some((m) => m.userId === data.assignedToId)
-              ? [...p.members, { userId: data.assignedToId, role: 'employee' as const, joinedAt: new Date().toISOString() }]
+              ? [...p.members, { userId: data.assignedToId, role: 'membre' as const, joinedAt: new Date().toISOString() }]
               : p.members,
           }
         : p
@@ -251,11 +261,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateSubtaskStatus: AppState['updateSubtaskStatus'] = useCallback((projectId, subtaskId, status) => {
     setProjects((prev) => prev.map((p) => {
       if (p.id !== projectId) return p;
-      const updatedSubtasks = p.subtasks.map((st) =>
-        st.id === subtaskId
-          ? { ...st, status, progress: status === 'done' ? 100 : status === 'review' ? Math.max(st.progress, 85) : st.progress }
-          : st
-      );
+      const updatedSubtasks = p.subtasks.map((st) => {
+        if (st.id !== subtaskId) return st;
+        // Auto-close a running session when the task leaves the working state
+        let next: Subtask = { ...st, status, progress: status === 'done' ? 100 : status === 'review' ? Math.max(st.progress, 85) : st.progress };
+        if (st.isActive && status !== 'in_progress') {
+          const endedAt = new Date().toISOString();
+          next = {
+            ...next,
+            isActive: false,
+            workSessions: (st.workSessions ?? []).map((s) =>
+              s.end === null
+                ? { ...s, end: endedAt, duration: Math.max(0, Math.round((Date.now() - new Date(s.start).getTime()) / 1000)) }
+                : s
+            ),
+          };
+        }
+        return next;
+      });
       const totalProgress = updatedSubtasks.length > 0
         ? Math.round(updatedSubtasks.reduce((acc, st) => acc + st.progress, 0) / updatedSubtasks.length)
         : 0;
@@ -267,27 +290,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: isCompleted ? ('completed' as ProjectStatus) : p.status,
       };
     }));
-    // Notify manager/admin about status change
     const proj = projects.find((p) => p.id === projectId);
     const st = proj?.subtasks.find((s) => s.id === subtaskId);
     if (proj && st) {
-      if (status === 'review') {
-        const notifyIds = [proj.managerId, 'u-admin-1'].filter((id): id is string => !!id && id !== currentUser?.id);
-        notifyIds.forEach((uid) => {
-          setNotifications((prev) => [
-            { id: `n-${Date.now()}-${uid}`, userId: uid, type: 'subtask_reviewed', title: 'Sous-tâche à valider', message: `« ${st.title} » est terminée et attend votre validation.`, projectId, read: false, createdAt: new Date().toISOString() },
-            ...prev,
-          ]);
-        });
-      } else {
-        const notifyIds = [proj.managerId, 'u-admin-1'].filter((id): id is string => !!id && id !== currentUser?.id);
-        notifyIds.forEach((uid) => {
-          setNotifications((prev) => [
-            { id: `n-${Date.now()}-${uid}`, userId: uid, type: 'project_completed', title: 'Tâche mise à jour', message: `La tâche « ${st.title} » est maintenant « ${status} ».`, projectId, read: false, createdAt: new Date().toISOString() },
-            ...prev,
-          ]);
-        });
-      }
+      const notifyIds = [proj.managerId, 'u-admin-1'].filter((id): id is string => !!id && id !== currentUser?.id);
+      const msgType = status === 'review' ? 'subtask_reviewed' : 'project_completed';
+      notifyIds.forEach((uid) => {
+        setNotifications((prev) => [
+          { id: `n-${Date.now()}-${uid}`, userId: uid, type: msgType, title: status === 'review' ? 'Sous-tâche à valider' : 'Tâche mise à jour', message: status === 'review' ? `« ${st.title} » est terminée et attend votre validation.` : `La tâche « ${st.title} » est maintenant « ${status} ».`, projectId, read: false, createdAt: new Date().toISOString() },
+          ...prev,
+        ]);
+      });
     }
   }, [projects, currentUser]);
 
@@ -296,7 +309,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (p.id !== projectId) return p;
       const updatedSubtasks = p.subtasks.map((st) =>
         st.id === subtaskId
-          ? { ...st, status: 'done' as SubtaskStatus, progress: 100, isActive: false }
+          ? { ...st, status: 'done' as SubtaskStatus, progress: 100 }
           : st
       );
       const totalProgress = updatedSubtasks.length > 0
@@ -330,7 +343,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...p,
         subtasks: p.subtasks.map((st) => st.id === subtaskId ? { ...st, assignedToId: employeeId } : st),
         members: employeeId && !p.members.some((m) => m.userId === employeeId)
-          ? [...p.members, { userId: employeeId, role: 'employee' as const, joinedAt: new Date().toISOString() }]
+          ? [...p.members, { userId: employeeId, role: 'membre' as const, joinedAt: new Date().toISOString() }]
           : p.members,
       };
     }));
@@ -344,33 +357,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [projects, currentUser]);
 
-  // ---- Pause / Resume task
+  // ---- Pause / Resume task (kept for backward compat, simplified)
   const toggleTaskActive: AppState['toggleTaskActive'] = useCallback((projectId, subtaskId) => {
-    setProjects((prev) => prev.map((p) => {
-      if (p.id !== projectId) return p;
-      return {
-        ...p,
-        subtasks: p.subtasks.map((st) => {
-          if (st.id !== subtaskId) return st;
-          if (st.isActive) {
-            // Pause: close the current session
-            const sessions = st.activeSessions.map((s) =>
-              s.endTime === null ? { ...s, endTime: new Date().toISOString() } : s
-            );
-            return { ...st, isActive: false, activeSessions: sessions };
-          } else {
-            // Resume: start a new session
-            const newSession = { id: `ts-${Date.now()}`, startTime: new Date().toISOString(), endTime: null };
-            return {
-              ...st,
-              isActive: true,
-              activeSessions: [...st.activeSessions, newSession],
-              status: st.status === 'todo' ? 'in_progress' as SubtaskStatus : st.status,
-            };
+    const now = new Date();
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            subtasks: p.subtasks.map((st) => {
+              if (st.id !== subtaskId) return st;
+              const sessions = st.workSessions ?? [];
+              // Resume: start a new session
+              if (!st.isActive) {
+                return {
+                  ...st,
+                  isActive: true,
+                  status: st.status === 'done' ? st.status : 'in_progress' as SubtaskStatus,
+                  workSessions: [...sessions, { start: now.toISOString(), end: null, duration: 0 }],
+                };
+              }
+              // Pause: close the running session
+              const closed = sessions.map((s) =>
+                s.end === null
+                  ? { ...s, end: now.toISOString(), duration: Math.max(0, Math.round((now.getTime() - new Date(s.start).getTime()) / 1000)) }
+                  : s
+              );
+              return {
+                ...st,
+                isActive: false,
+                workSessions: closed,
+              };
+            }),
           }
-        }),
-      };
-    }));
+        : p
+    ));
   }, []);
 
   // ---- Modification requests
@@ -411,7 +431,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? { ...m, status: decision as ModificationStatus, reviewedById: currentUser.id, reviewNote: note, reviewedAt: new Date().toISOString() }
           : m
       );
-      // If approved, apply the change
       let subtasks = p.subtasks;
       let projPatch: Partial<typeof p> = {};
       const mod = p.modifications.find((m) => m.id === modificationId);
@@ -435,7 +454,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return { ...p, ...projPatch, modifications: mods, subtasks };
     }));
-    // Notify the requester
     const proj = projects.find((p) => p.id === projectId);
     const mod = proj?.modifications.find((m) => m.id === modificationId);
     if (mod) {
@@ -446,52 +464,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, projects]);
 
-  // ---- Messaging
-  const sendMessage: AppState['sendMessage'] = useCallback((channelId, content, attachments = []) => {
-    if (!currentUser) return;
-    const newMessage: Message = {
-      id: `m-${Date.now()}`,
-      channelId,
+  // ---- Task comments
+  const addSubtaskComment: AppState['addSubtaskComment'] = useCallback((projectId, subtaskId, content) => {
+    if (!currentUser || !content.trim()) return;
+    const newComment = {
+      id: `c-${Date.now()}`,
+      subtaskId,
       authorId: currentUser.id,
       content,
-      attachments,
       createdAt: new Date().toISOString(),
     };
-    setProjects((prev) => prev.map((p) => {
-      const ch = p.channels.find((c) => c.id === channelId);
-      if (!ch) return p;
-      return {
-        ...p,
-        channels: p.channels.map((c) =>
-          c.id === channelId ? { ...c, messages: [...c.messages, newMessage] } : c
-        ),
-      };
-    }));
-    // Notify all channel participants except sender
-    const proj = projects.find((p) => p.channels.some((c) => c.id === channelId));
-    const ch = proj?.channels.find((c) => c.id === channelId);
-    if (ch && proj) {
-      ch.participants.forEach((p) => {
-        if (p.userId === currentUser.id) return;
-        setNotifications((prev) => [
-          { id: `n-${Date.now()}-${p.userId}`, userId: p.userId, type: 'new_message', title: 'Nouveau message', message: `${currentUser.name}: ${content.slice(0, 60)}`, projectId: proj.id, read: false, createdAt: new Date().toISOString() },
-          ...prev,
-        ]);
-      });
-    }
-  }, [currentUser, projects]);
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            subtasks: p.subtasks.map((st) =>
+              st.id === subtaskId ? { ...st, comments: [...st.comments, newComment] } : st
+            ),
+          }
+        : p
+    ));
+  }, [currentUser]);
 
-  // ---- Employee management
+  // ---- Client meeting (post-framing report)
+  const scheduleClientMeeting: AppState['scheduleClientMeeting'] = useCallback((projectId, data) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId ? { ...p, clientMeeting: { date: data.date, note: data.note } } : p
+    ));
+    setNotifications((prev) => {
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) return prev;
+      return [
+        { id: `n-${Date.now()}`, userId: project.clientId, type: 'calendar_event', title: 'Rendez-vous client planifié', message: `Un rendez-vous de rapport a été planifié pour votre projet « ${project.title} ».`, projectId, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ];
+    });
+  }, [projects]);
+
+  // ---- Employee / member management
   const addEmployee: AppState['addEmployee'] = useCallback((data) => {
     const newUser: User = {
       id: `u-${Date.now()}`,
       name: data.name,
       email: data.email,
       role: data.role,
+      memberSpecialty: data.memberSpecialty,
       avatarUrl: data.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=b6e3f4`,
-      jobTitle: data.jobTitle,
-      availability: data.availability ?? 'available',
-      workload: 0,
+      password: data.password,
       phone: data.phone,
       company: data.company,
       address: data.address,
@@ -500,6 +519,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setUsers((prev) => [...prev, newUser]);
   }, []);
+
+  // Admin-only: update any user's info
+  const updateUser: AppState['updateUser'] = useCallback((userId, data) => {
+    if (currentUser?.role !== 'admin') return;
+    setUsers((prev) => prev.map((u) =>
+      u.id === userId ? { ...u, ...data } : u
+    ));
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser((prev) => prev ? { ...prev, ...data } : prev);
+    }
+  }, [currentUser]);
 
   const updateProfile: AppState['updateProfile'] = useCallback((data) => {
     if (!currentUser) return;
@@ -525,15 +555,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addProjectMember, removeProjectMember,
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
     suggestModification, reviewModification,
-    addEmployee, updateProfile,
-    sendMessage, markNotificationRead, markAllNotificationsRead,
+    addSubtaskComment,
+    scheduleClientMeeting,
+    addEmployee, updateUser, updateProfile,
+    markNotificationRead, markAllNotificationsRead,
   }), [currentUser, sessionInitialized, login, logout, users, projects, notifications,
        submitProject, validateProject, rejectProject, assignManager,
        addProjectMember, removeProjectMember,
-addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
+       addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
        suggestModification, reviewModification,
-       addEmployee, updateProfile,
-       sendMessage, markNotificationRead, markAllNotificationsRead]);
+       addSubtaskComment,
+       scheduleClientMeeting,
+       addEmployee, updateUser, updateProfile,
+       markNotificationRead, markAllNotificationsRead]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import {
   FolderKanban, Clock, CheckCircle2, Users, AlertTriangle,
   TrendingUp, FileText, CheckSquare, Edit3, Check, ListTodo,
+  Briefcase, Layers,
 } from 'lucide-react';
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar,
+} from 'recharts';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
@@ -17,6 +22,8 @@ import { PriorityBadge, SubtaskStatusBadge } from '@/components/shared/badges';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { projectStatusMeta, formatDate, getUser } from '@/lib/status';
+
+const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
 export default function DashboardPage() {
   const user = useAuthGuard();
@@ -31,16 +38,51 @@ export default function DashboardPage() {
     let list = projects;
     if (user.role === 'client') {
       list = list.filter((p) => p.clientId === user.id);
-    } else if (user.role === 'manager') {
+    } else if (user.role === 'chef_de_projet') {
       list = list.filter((p) => p.managerId === user.id);
-    } else if (user.role === 'employee') {
-      list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id));
+    } else if (user.role === 'membre') {
+      list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id) || p.members.some((m) => m.userId === user.id));
     }
     if (statusFilter !== 'all') list = list.filter((p) => p.status === statusFilter);
     if (priorityFilter !== 'all') list = list.filter((p) => p.priority === priorityFilter);
     if (search) list = list.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()));
     return list;
   }, [user, projects, statusFilter, priorityFilter, search]);
+
+  // ---- Global activity & tasks charts data
+  const activityData = useMemo(() => {
+    const created = MONTHS.map((_, mi) => ({ month: MONTHS[mi], created: 0, delivered: 0 }));
+    projects.forEach((p) => {
+      const c = new Date(p.createdAt).getMonth();
+      created[c].created += 1;
+      if (p.status === 'completed') {
+        const e = new Date(p.endDate).getMonth();
+        created[e].delivered += 1;
+      }
+    });
+    return created;
+  }, [projects]);
+
+  const globalTasksData = useMemo(() => {
+    const allTasks = projects.flatMap((p) => p.subtasks);
+    const cnt = { todo: 0, in_progress: 0, review: 0, done: 0 };
+    allTasks.forEach((t) => { cnt[t.status] += 1; });
+    return [
+      { name: 'À faire', value: cnt.todo, color: 'hsl(var(--muted-foreground))' },
+      { name: 'En cours', value: cnt.in_progress, color: 'hsl(var(--primary))' },
+      { name: 'En révision', value: cnt.review, color: 'hsl(var(--accent))' },
+      { name: 'Terminées', value: cnt.done, color: 'hsl(var(--success))' },
+    ];
+  }, [projects]);
+
+  const statusDistribution = useMemo(() => {
+    return (Object.keys(projectStatusMeta) as (keyof typeof projectStatusMeta)[])
+      .map((k) => ({
+        name: projectStatusMeta[k].label,
+        value: projects.filter((p) => p.status === k).length,
+      }))
+      .filter((d) => d.value > 0);
+  }, [projects]);
 
   if (!user) return null;
 
@@ -49,12 +91,12 @@ export default function DashboardPage() {
   const pendingProjects = projects.filter((p) => p.status === 'pending');
   const inProgressProjects = projects.filter((p) => p.status === 'in_progress');
   const completedProjects = projects.filter((p) => p.status === 'completed');
-  const allEmployees = users.filter((u) => u.role === 'employee');
+  const allEmployees = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
   const allPendingMods = projects.flatMap((p) => p.modifications.filter((m) => m.status === 'pending').map((m) => ({ ...m, projectTitle: p.title })));
-  const reviewTasks = (role === 'admin' || role === 'manager')
+  const reviewTasks = (role === 'admin' || role === 'chef_de_projet')
     ? projects.flatMap((p) => p.subtasks.filter((st) => st.status === 'review').map((st) => ({ ...st, projectTitle: p.title })))
     : [];
-  const myTasks = role === 'employee'
+  const myTasks = role === 'membre'
     ? projects.flatMap((p) => p.subtasks.filter((st) => st.assignedToId === user.id).map((st) => ({ ...st, projectTitle: p.title })))
     : [];
 
@@ -66,10 +108,10 @@ export default function DashboardPage() {
     stats = [
       { label: 'Projets en attente', value: pendingProjects.length, icon: Clock, color: 'text-warning', trend: pendingProjects.length > 3 ? { value: 'Action requise', positive: false } : undefined, onClick: () => router.push('/projects') },
       { label: 'Projets en cours', value: inProgressProjects.length, icon: TrendingUp, color: 'text-primary', onClick: () => router.push('/projects') },
-      { label: 'Employés actifs', value: allEmployees.length, icon: Users, color: 'text-accent', onClick: () => router.push('/employees') },
+      { label: 'Équipe', value: allEmployees.length, icon: Users, color: 'text-accent', onClick: () => router.push('/employees') },
       { label: 'Projets terminés', value: completedProjects.length, icon: CheckCircle2, color: 'text-success', onClick: () => router.push('/projects') },
     ];
-  } else if (role === 'manager') {
+  } else if (role === 'chef_de_projet') {
     const myProjects = projects.filter((p) => p.managerId === user.id);
     stats = [
       { label: 'Mes projets', value: myProjects.length, icon: FolderKanban, color: 'text-primary', onClick: () => router.push('/projects') },
@@ -77,7 +119,7 @@ export default function DashboardPage() {
       { label: 'Tâches totales', value: myProjects.flatMap((p) => p.subtasks).length, icon: CheckSquare, color: 'text-warning', onClick: () => router.push('/projects') },
       { label: 'Terminés', value: myProjects.filter((p) => p.status === 'completed').length, icon: CheckCircle2, color: 'text-success', onClick: () => router.push('/projects') },
     ];
-  } else if (role === 'employee') {
+  } else if (role === 'membre') {
     stats = [
       { label: 'Mes tâches', value: myTasks.length, icon: CheckSquare, color: 'text-primary', onClick: () => router.push('/tasks') },
       { label: 'À faire', value: myTasks.filter((t) => t.status === 'todo').length, icon: Clock, color: 'text-warning', onClick: () => router.push('/tasks') },
@@ -102,8 +144,8 @@ export default function DashboardPage() {
         <h2 className="font-display text-2xl font-bold tracking-tight">{greeting}</h2>
         <p className="text-muted-foreground mt-1">
           {role === 'admin' && 'Vue d\'ensemble de tous les projets et de l\'équipe'}
-          {role === 'manager' && 'Suivez et gérez vos projets assignés'}
-          {role === 'employee' && 'Vos tâches et votre travail à accomplir'}
+          {role === 'chef_de_projet' && 'Suivez et gérez vos projets assignés'}
+          {role === 'membre' && 'Vos tâches et votre travail à accomplir'}
           {role === 'client' && 'Suivez l\'avancement de vos projets'}
         </p>
       </div>
@@ -183,8 +225,8 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* Admin/Manager: subtasks pending validation */}
-      {(role === 'admin' || role === 'manager') && reviewTasks.length > 0 && (
+      {/* Admin/Chef de projet: subtasks pending validation */}
+      {(role === 'admin' || role === 'chef_de_projet') && reviewTasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -220,7 +262,7 @@ export default function DashboardPage() {
       )}
 
       {/* Employee: quick task overview */}
-      {role === 'employee' && myTasks.length > 0 && (
+      {role === 'membre' && myTasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -252,10 +294,107 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
+      {/* Charts: activité mensuelle + répartition tâches globales (admin & chef de projet) */}
+      {(role === 'admin' || role === 'chef_de_projet') && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6"
+        >
+          {/* Activité mensuelle */}
+          <Card className="p-5 lg:col-span-2">
+            <div className="flex items-baseline justify-between gap-4 mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" /> Activité mensuelle
+              </h3>
+              <span className="text-xs text-muted-foreground">12 derniers mois</span>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={activityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorDelivered" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={{ stroke: 'hsl(var(--border))' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={{ stroke: 'hsl(var(--border))' }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                  />
+                  <Legend />
+                  <Area type="monotone" dataKey="created" name="Projets créés" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#colorCreated)" />
+                  <Area type="monotone" dataKey="delivered" name="Projets livrés" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="6 3" fill="url(#colorDelivered)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* Répartition des tâches globales */}
+          <Card className="p-5">
+            <div className="flex items-baseline justify-between gap-4 mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Layers className="h-4 w-4 text-accent" /> Tâches globales
+              </h3>
+              <span className="text-xs text-muted-foreground">{projects.reduce((s, p) => s + p.subtasks.length, 0)} tâches</span>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={globalTasksData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                    {globalTasksData.map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Client: chart of their projects by status */}
+      {role === 'client' && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+          className="mb-6"
+        >
+          <Card className="p-5">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" /> Répartition de mes projets par statut
+            </h3>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={statusDistribution} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                  <Bar dataKey="value" name="Projets" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Filters + Projects grid */}
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-display text-lg font-semibold">
-          {role === 'admin' ? 'Tous les projets' : role === 'employee' ? 'Mes projets' : 'Projets'}
+          {role === 'admin' ? 'Tous les projets' : role === 'membre' ? 'Mes projets' : 'Projets'}
         </h3>
         {role === 'client' && (
           <Button size="sm" onClick={() => router.push('/submit')}>

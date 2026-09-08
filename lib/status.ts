@@ -41,10 +41,21 @@ export const priorityMeta: Record<Priority, { label: string; color: string; bg: 
 };
 
 export const roleMeta: Record<Role, { label: string; color: string; bg: string }> = {
-  client:   { label: 'Client',    color: 'text-info',        bg: 'bg-info/10 dark:bg-info/15' },
-  admin:    { label: 'Admin',     color: 'text-destructive', bg: 'bg-destructive/10 dark:bg-destructive/15' },
-  manager:  { label: 'Manager',   color: 'text-success',     bg: 'bg-success/10 dark:bg-success/15' },
-  employee: { label: 'Employé',   color: 'text-chart-5',     bg: 'bg-chart-5/10 dark:bg-chart-5/15' },
+  admin:         { label: 'Admin',         color: 'text-destructive', bg: 'bg-destructive/10 dark:bg-destructive/15' },
+  chef_de_projet:{ label: 'Chef de projet',color: 'text-primary',     bg: 'bg-primary/10 dark:bg-primary/15' },
+  membre:        { label: 'Membre',        color: 'text-info',        bg: 'bg-info/10 dark:bg-info/15' },
+  client:        { label: 'Client',        color: 'text-chart-5',     bg: 'bg-chart-5/10 dark:bg-chart-5/15' },
+};
+
+export const specialtyMeta: Record<string, { label: string; color: string; bg: string }> = {
+  'Designer':               { label: 'Designer',               color: 'text-chart-5', bg: 'bg-chart-5/10 dark:bg-chart-5/15' },
+  'DevOps':                 { label: 'DevOps',                 color: 'text-info',    bg: 'bg-info/10 dark:bg-info/15' },
+  'Frontend':               { label: 'Développeur Frontend',   color: 'text-primary', bg: 'bg-primary/10 dark:bg-primary/15' },
+  'Backend':                { label: 'Développeur Backend',    color: 'text-success', bg: 'bg-success/10 dark:bg-success/15' },
+  'Fullstack':              { label: 'Développeur Fullstack',  color: 'text-warning', bg: 'bg-warning/10 dark:bg-warning/15' },
+  'QA':                     { label: 'QA / Testeur',           color: 'text-muted-foreground', bg: 'bg-muted' },
+  'Chef de projet junior':  { label: 'Chef de projet junior',  color: 'text-info',    bg: 'bg-info/10 dark:bg-info/15' },
+  'Autre':                  { label: 'Autre',                  color: 'text-muted-foreground', bg: 'bg-muted' },
 };
 
 export const availabilityMeta: Record<string, { label: string; color: string; dot: string }> = {

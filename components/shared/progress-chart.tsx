@@ -21,7 +21,7 @@ export function ProgressChart({ data }: { data: ProgressPoint[] }) {
   if (data.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        <p>Aucune donnée d'avancement disponible.</p>
+        <p>Aucune donnée d’avancement disponible.</p>
         <p className="text-sm mt-1">Les courbes apparaîtront une fois le projet en cours.</p>
       </div>
     );

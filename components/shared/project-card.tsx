@@ -14,7 +14,7 @@ export function ProjectCard({ project, index = 0 }: { project: Project; index?: 
   const { users } = useApp();
   const manager = getUser(users, project.managerId);
   const client = getUser(users, project.clientId);
-  const teamMembers = project.members.filter((m) => m.role === 'employee' || m.role === 'manager');
+  const teamMembers = project.members.filter((m) => m.role === 'membre' || m.role === 'chef_de_projet');
   const daysLeft = daysUntil(project.endDate);
   const isLate = daysLeft < 0 && project.status === 'in_progress';
   const pendingMods = project.modifications.filter((m) => m.status === 'pending');

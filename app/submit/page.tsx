@@ -42,6 +42,10 @@ export default function SubmitProjectPage() {
     priority: 'medium' as Priority,
     startDate: '',
     endDate: '',
+    platformUsers: '',
+    desiredFeatures: '',
+    necessaryPages: '',
+    plannedFeatures: '',
   });
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
@@ -97,6 +101,10 @@ export default function SubmitProjectPage() {
       endDate: new Date(form.endDate).toISOString(),
       logoUrl,
       attachments,
+      platformUsers: form.platformUsers,
+      desiredFeatures: form.desiredFeatures,
+      necessaryPages: form.necessaryPages,
+      plannedFeatures: form.plannedFeatures,
     });
     setSubmitted(true);
   };
@@ -119,13 +127,13 @@ export default function SubmitProjectPage() {
           </motion.div>
           <h2 className="font-display text-2xl font-bold mb-2">Projet soumis avec succès !</h2>
           <p className="text-muted-foreground mb-6">
-            Votre projet « {form.title} » a été envoyé. Un administrateur l'examinera et vous recevrez une notification dès qu'il sera validé.
+            Votre projet « {form.title} » a été envoyé. Un administrateur l’examinera et vous recevrez une notification dès qu’il sera validé.
           </p>
           <div className="flex gap-3 justify-center">
             <Button onClick={() => router.push('/dashboard')}>Retour au dashboard</Button>
             <Button variant="outline" onClick={() => {
               setSubmitted(false);
-              setForm({ title: '', description: '', category: '', budget: '', priority: 'medium', startDate: '', endDate: '' });
+              setForm({ title: '', description: '', category: '', budget: '', priority: 'medium', startDate: '', endDate: '', platformUsers: '', desiredFeatures: '', necessaryPages: '', plannedFeatures: '' });
               setAttachments([]);
               setLogoUrl(undefined);
               setLogoPreview(undefined);
@@ -148,7 +156,7 @@ export default function SubmitProjectPage() {
       <div className="max-w-2xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Soumettre un nouveau projet</h2>
-          <p className="text-muted-foreground mb-6">Décrivez votre projet en détail. Un administrateur l'examinera avant validation.</p>
+          <p className="text-muted-foreground mb-6">Décrivez votre projet en détail. Un administrateur l’examinera avant validation.</p>
         </motion.div>
 
         <Card className="p-6">
@@ -211,6 +219,29 @@ export default function SubmitProjectPage() {
                 <Label htmlFor="budget">Budget (€)</Label>
                 <Input id="budget" type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="Ex: 30000" />
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="platformUsers">Utilisateurs de la plateforme</Label>
+              <Textarea id="platformUsers" value={form.platformUsers} onChange={(e) => setForm({ ...form, platformUsers: e.target.value })} placeholder="Ex: Administrateurs, clients, gestionnaires de stock, livreurs..." rows={2} />
+              <p className="text-xs text-muted-foreground mt-1">Décrivez les types d’utilisateurs qui utiliseront votre plateforme.</p>
+            </div>
+
+            <div>
+              <Label htmlFor="desiredFeatures">Fonctionnalités souhaitées</Label>
+              <Textarea id="desiredFeatures" value={form.desiredFeatures} onChange={(e) => setForm({ ...form, desiredFeatures: e.target.value })} placeholder="Ex: Catalogue produits, panier, paiement en ligne, espace client, notifications..." rows={3} />
+            </div>
+
+            <div>
+              <Label htmlFor="necessaryPages">Pages nécessaires pour le projet</Label>
+              <Textarea id="necessaryPages" value={form.necessaryPages} onChange={(e) => setForm({ ...form, necessaryPages: e.target.value })} placeholder="Ex: Accueil, Catalogue, Fiche produit, Panier, Checkout, Espace client, Admin..." rows={3} />
+              <p className="text-xs text-muted-foreground mt-1">Listez les pages que vous souhaitez voir dans votre projet.</p>
+            </div>
+
+            <div>
+              <Label htmlFor="plannedFeatures">Fonctionnalités prévues</Label>
+              <Textarea id="plannedFeatures" value={form.plannedFeatures} onChange={(e) => setForm({ ...form, plannedFeatures: e.target.value })} placeholder="Ex: Gestion multi-boutique, promos, avis, intégration analytics..." rows={3} />
+              <p className="text-xs text-muted-foreground mt-1">Fonctionnalités que vous prévoyez d’ajouter, même ultérieurement.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -21,8 +21,8 @@ export default function ProjectsPage() {
     if (!user) return [];
     let list = projects;
     if (user.role === 'client') list = list.filter((p) => p.clientId === user.id);
-    else if (user.role === 'manager') list = list.filter((p) => p.managerId === user.id);
-    else if (user.role === 'employee') list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id));
+    else if (user.role === 'chef_de_projet') list = list.filter((p) => p.managerId === user.id);
+    else if (user.role === 'membre') list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id));
     if (statusFilter !== 'all') list = list.filter((p) => p.status === statusFilter);
     if (priorityFilter !== 'all') list = list.filter((p) => p.priority === priorityFilter);
     if (search) list = list.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()));

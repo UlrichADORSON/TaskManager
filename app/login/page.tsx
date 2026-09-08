@@ -21,10 +21,10 @@ const demoAccounts: {
   icon: React.ComponentType<{ className?: string }>;
   accent: string;
 }[] = [
-  { role: 'admin',    email: 'sophie.laurent@proflow.io', password: 'admin123',    desc: 'Gère tous les projets',       icon: Shield,    accent: 'text-destructive' },
-  { role: 'manager',  email: 'karim.benali@proflow.io',  password: 'manager123',  desc: 'Assistant projets & équipes', icon: Briefcase, accent: 'text-success' },
-  { role: 'employee', email: 'thomas.dubois@proflow.io', password: 'employe123',  desc: 'Exécute les sous-tâches',     icon: Wrench,    accent: 'text-chart-5' },
-  { role: 'client',   email: 'camille@techstart.fr',     password: 'client123',   desc: 'Soumet et suit ses projets',  icon: UserIcon,  accent: 'text-info' },
+  { role: 'admin',         email: 'sophie.laurent@proflow.io', password: 'admin123',   desc: 'Gère tous les projets',            icon: Shield,    accent: 'text-destructive' },
+  { role: 'chef_de_projet',email: 'karim.benali@proflow.io',  password: 'manager123', desc: 'Chef de projet — pilote les projets', icon: Briefcase, accent: 'text-primary' },
+  { role: 'membre',        email: 'thomas.dubois@proflow.io', password: 'employe123', desc: 'Membre — exécute les sous-tâches',   icon: Wrench,    accent: 'text-info' },
+  { role: 'client',        email: 'camille@techstart.fr',     password: 'client123',  desc: 'Soumet et suit ses projets',        icon: UserIcon,  accent: 'text-chart-5' },
 ];
 
 export default function LoginPage() {

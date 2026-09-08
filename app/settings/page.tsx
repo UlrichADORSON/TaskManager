@@ -17,7 +17,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { UserAvatar } from '@/components/shared/user-avatar';
-import { RoleBadge, AvailabilityBadge } from '@/components/shared/badges';
+import { RoleBadge } from '@/components/shared/badges';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { specialtyMeta } from '@/lib/status';
+import type { MemberSpecialty } from '@/types';
 import { toast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
@@ -30,7 +35,7 @@ export default function SettingsPage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', company: '', address: '', bio: '', jobTitle: '',
+    name: '', email: '', phone: '', company: '', address: '', bio: '', memberSpecialty: '' as MemberSpecialty | '',
   });
 
   useEffect(() => setMounted(true), []);
@@ -45,7 +50,7 @@ export default function SettingsPage() {
         company: loaded.company ?? '',
         address: loaded.address ?? '',
         bio: loaded.bio ?? '',
-        jobTitle: loaded.jobTitle ?? '',
+        memberSpecialty: loaded.memberSpecialty ?? '',
       });
     }
   }, [user?.id, users, editing]);
@@ -71,7 +76,7 @@ export default function SettingsPage() {
       company: form.company.trim(),
       address: form.address.trim(),
       bio: form.bio.trim(),
-      jobTitle: form.jobTitle.trim(),
+      memberSpecialty: form.memberSpecialty || undefined,
     });
     setEditing(false);
     toast({ title: 'Profil mis à jour', description: 'Vos informations ont été enregistrées.' });
@@ -83,7 +88,7 @@ export default function SettingsPage() {
     setForm({
       name: u.name ?? '', email: u.email ?? '', phone: u.phone ?? '',
       company: u.company ?? '', address: u.address ?? '', bio: u.bio ?? '',
-      jobTitle: u.jobTitle ?? '',
+      memberSpecialty: u.memberSpecialty ?? '',
     });
   };
 
@@ -128,7 +133,6 @@ export default function SettingsPage() {
               <p className="font-semibold text-lg">{loaded.name}</p>
               <div className="flex items-center gap-2 mt-1">
                 <RoleBadge role={loaded.role} />
-                {loaded.availability && <AvailabilityBadge availability={loaded.availability} />}
               </div>
             </div>
           </div>
@@ -143,9 +147,9 @@ export default function SettingsPage() {
                   <Phone className="h-4 w-4" /> {loaded.phone}
                 </div>
               )}
-              {loaded.jobTitle && (
+              {loaded.memberSpecialty && (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Briefcase className="h-4 w-4" /> {loaded.jobTitle}
+                  <Briefcase className="h-4 w-4" /> {specialtyMeta[loaded.memberSpecialty]?.label ?? loaded.memberSpecialty}
                 </div>
               )}
               {loaded.company && (
@@ -160,20 +164,6 @@ export default function SettingsPage() {
               )}
               {loaded.bio && (
                 <p className="text-sm text-muted-foreground pt-2 border-t border-border">{loaded.bio}</p>
-              )}
-              {typeof loaded.workload === 'number' && (
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-1.5">
-                    <span className="text-muted-foreground">Charge de travail</span>
-                    <span className="font-semibold">{loaded.workload}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${Math.min(loaded.workload, 100)}%` }}
-                    />
-                  </div>
-                </div>
               )}
             </div>
           ) : (
@@ -191,10 +181,17 @@ export default function SettingsPage() {
                   <Label htmlFor="p-phone">Téléphone</Label>
                   <Input id="p-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 06 12 34 56 78" />
                 </div>
-                {loaded.jobTitle !== undefined && user.role !== 'client' && (
-                  <div>
-                    <Label htmlFor="p-job">Poste</Label>
-                    <Input id="p-job" value={form.jobTitle} onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />
+                {loaded.memberSpecialty !== undefined && user.role === 'membre' && (
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="p-specialty">Spécialité</Label>
+                    <Select value={form.memberSpecialty || undefined} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
+                      <SelectTrigger id="p-specialty"><SelectValue placeholder="Choisir une spécialité" /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(specialtyMeta).map(([key, meta]) => (
+                          <SelectItem key={key} value={key}>{meta.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
                 {showCompany && (
@@ -227,7 +224,7 @@ export default function SettingsPage() {
         {/* Appearance */}
         <Card className="p-6">
           <h3 className="font-semibold mb-5">Apparence</h3>
-          <p className="text-sm text-muted-foreground mb-4">Choisissez le thème de l'application.</p>
+          <p className="text-sm text-muted-foreground mb-4">Choisissez le thème de l’application.</p>
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant={theme === 'light' ? 'default' : 'outline'}

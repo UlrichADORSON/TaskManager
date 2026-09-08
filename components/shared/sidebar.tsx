@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, FolderKanban, Users, MessageSquare, CheckSquare,
+  LayoutDashboard, FolderKanban, Users, CheckSquare,
   FileText, Settings, LogOut, ChevronLeft, Layers, Bell,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -19,13 +19,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, roles: ['admin', 'manager', 'employee', 'client'] },
-  { label: 'Projets',      href: '/projects',      icon: FolderKanban,    roles: ['admin', 'manager', 'employee', 'client'] },
-  { label: 'Mes tâches',   href: '/tasks',         icon: CheckSquare,     roles: ['employee'] },
-  { label: 'Employés',     href: '/employees',     icon: Users,           roles: ['admin', 'manager'] },
-  { label: 'Messages',     href: '/messages',      icon: MessageSquare,   roles: ['admin', 'manager', 'employee', 'client'] },
+  { label: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
+  { label: 'Projets',      href: '/projects',      icon: FolderKanban,    roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
+  { label: 'Mes tâches',   href: '/tasks',         icon: CheckSquare,     roles: ['membre'] },
+  { label: 'Équipe',       href: '/employees',     icon: Users,           roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Soumettre',    href: '/submit',        icon: FileText,        roles: ['client'] },
-  { label: 'Notifications',href: '/notifications', icon: Bell,            roles: ['admin', 'manager', 'employee', 'client'] },
+  { label: 'Notifications',href: '/notifications', icon: Bell,            roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
 ];
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {

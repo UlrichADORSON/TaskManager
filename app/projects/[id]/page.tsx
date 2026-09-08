@@ -1,19 +1,18 @@
 'use client';
 
 import { useState, lazy, Suspense } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const GanttChart = lazy(() => import('@/components/shared/gantt-chart').then(m => ({ default: m.GanttChart })));
 const ProgressChart = lazy(() => import('@/components/shared/progress-chart').then(m => ({ default: m.ProgressChart })));
-const DiscussionChannel = lazy(() => import('@/components/shared/discussion-channel').then(m => ({ default: m.DiscussionChannel })));
 import {
   ArrowLeft, Calendar, Euro, Users, FolderKanban, BarChart3,
-  MessageSquare, GanttChartSquare, Info, UserCircle,
+  MessageSquare, GanttChartSquare, Info, UserCircle, CalendarDays, MapPin, Clock,
   CheckCircle2, XCircle, UserCog, Plus, UserPlus,
-  FileText, Image as ImageIcon, Edit3, Clock, AlertCircle,
+  FileText, Image as ImageIcon, Edit3, AlertCircle,
   Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo,
-  Phone, Building2, MapPin, User,
+  Phone, Building2, User as UserIcon, CalendarClock,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -32,28 +31,35 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  StatusBadge, PriorityBadge, SubtaskStatusBadge, RoleBadge, AvailabilityBadge,
+  StatusBadge, PriorityBadge, SubtaskStatusBadge, RoleBadge,
 } from '@/components/shared/badges';
 import { UserAvatar } from '@/components/shared/user-avatar';
+import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
 import { ProgressBar, ProgressRing } from '@/components/shared/progress';
 import {
-  getUser, formatDate, formatCurrency, daysUntil, daysBetween,
+  getUser, formatDate, formatDateTime, formatCurrency, daysUntil, daysBetween,
+  specialtyMeta,
 } from '@/lib/status';
-import type { SubtaskStatus, Priority, ModificationRequest } from '@/types';
+import type { SubtaskStatus, Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function ProjectDetailPage() {
   const user = useAuthGuard();
   const {
-    projects, users, validateProject, rejectProject, assignManager,
+    projects, users,     validateProject, rejectProject, assignManager,
     addSubtask, addProjectMember, removeProjectMember, reviewModification,
-    suggestModification, approveSubtask,
+    suggestModification, approveSubtask, addSubtaskComment,
+    scheduleClientMeeting,
+    addEmployee: addEmployeeFromContext,
   } = useApp();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get('tab') as string | null;
   const projectId = params?.id as string;
   const project = projects.find((p) => p.id === projectId);
 
+  const [activeTab, setActiveTab] = useState<string>(initialTab && ['info', 'gantt', 'progress', 'calendar', 'tasks', 'team', 'modifications'].includes(initialTab) ? initialTab : 'info');
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedManager, setSelectedManager] = useState('');
@@ -63,7 +69,10 @@ export default function ProjectDetailPage() {
     assignedToId: '', startDate: '', dueDate: '', dependsOnId: '',
   });
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [memberForm, setMemberForm] = useState({
+    existingUserId: '', role: 'membre' as Role,
+    createNew: false, name: '', email: '', password: '', specialty: 'Designer' as string,
+  });
   const [reviewDialog, setReviewDialog] = useState<{ mod: ModificationRequest; decision: 'approved' | 'rejected' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [fileViewer, setFileViewer] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
@@ -75,6 +84,12 @@ export default function ProjectDetailPage() {
     newValue: '',
     reason: '',
   });
+  // Task discussion state
+  const [discussionSubtask, setDiscussionSubtask] = useState<Subtask | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const [meetingForm, setMeetingForm] = useState({ date: '', note: '' });
+  const [profileUser, setProfileUser] = useState<User | null>(null);
 
   if (!user) return null;
   if (!project) {
@@ -90,17 +105,15 @@ export default function ProjectDetailPage() {
 
   const client = getUser(users, project.clientId);
   const teamMembers = project.members.map((m) => ({ ...m, user: getUser(users, m.userId) })).filter((m) => m.user);
-  const employees = users.filter((u) => u.role === 'employee');
-  const managers = users.filter((u) => u.role === 'manager');
+  const members = users.filter((u) => u.role === 'membre');
+  const chefs = users.filter((u) => u.role === 'chef_de_projet');
   const daysLeft = daysUntil(project.endDate);
   const isLate = daysLeft < 0 && project.status === 'in_progress';
-  const canManage = user.role === 'admin' || user.role === 'manager';
+  const canManage = user.role === 'admin' || user.role === 'chef_de_projet';
   const isProjectMember = project.members.some((m) => m.userId === user.id);
-  const canViewAttachments = user.role === 'admin' || user.role === 'manager' || isProjectMember;
-  const clientAdminChannel = project.channels.find((c) => c.type === 'client_admin');
-  const groupChannel = project.channels.find((c) => c.type === 'project_group');
+  const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
   const pendingMods = project.modifications.filter((m) => m.status === 'pending');
-  const availableEmployees = employees.filter((e) => !project.members.some((m) => m.userId === e.id));
+  const availableEmployees = members.filter((e) => !project.members.some((m) => m.userId === e.id));
 
   const handleReject = () => {
     if (rejectReason.trim()) {
@@ -127,10 +140,23 @@ export default function ProjectDetailPage() {
   };
 
   const handleAddMember = () => {
-    if (!selectedEmployee) return;
-    addProjectMember(project.id, selectedEmployee);
-    setAddMemberOpen(false);
-    setSelectedEmployee('');
+    if (memberForm.createNew) {
+      if (!memberForm.name || !memberForm.email || !memberForm.password) return;
+      // Create a new user account then add as member
+      addEmployeeFromContext({
+        name: memberForm.name, email: memberForm.email, password: memberForm.password,
+        phone: '',
+        role: memberForm.role === 'chef_de_projet' ? 'chef_de_projet' : 'membre',
+        memberSpecialty: memberForm.role === 'chef_de_projet' ? undefined : memberForm.specialty as MemberSpecialty,
+      });
+      setAddMemberOpen(false);
+      setMemberForm({ existingUserId: '', role: 'membre', createNew: false, name: '', email: '', password: '', specialty: 'Designer' });
+    } else {
+      if (!memberForm.existingUserId) return;
+      addProjectMember(project.id, { userId: memberForm.existingUserId, role: memberForm.role });
+      setAddMemberOpen(false);
+      setMemberForm({ existingUserId: '', role: 'membre', createNew: false, name: '', email: '', password: '', specialty: 'Designer' });
+    }
   };
 
   const handleReview = () => {
@@ -138,6 +164,22 @@ export default function ProjectDetailPage() {
     reviewModification(project.id, reviewDialog.mod.id, reviewDialog.decision, reviewNote);
     setReviewDialog(null);
     setReviewNote('');
+  };
+
+  const handleSendComment = () => {
+    if (!discussionSubtask || !commentText.trim()) return;
+    addSubtaskComment(project.id, discussionSubtask.id, commentText);
+    setCommentText('');
+  };
+
+  const handleAddMeeting = () => {
+    if (!meetingForm.date) return;
+    scheduleClientMeeting(project.id, {
+      date: new Date(meetingForm.date).toISOString(),
+      note: meetingForm.note.trim(),
+    });
+    setMeetingOpen(false);
+    setMeetingForm({ date: '', note: '' });
   };
 
   const fileIcon = (type: string) => {
@@ -192,6 +234,10 @@ export default function ProjectDetailPage() {
     setModReqOpen(false);
     setModReq({ target: 'project', subtaskId: '', field: 'description', newValue: '', reason: '' });
   };
+
+  // Compute duration in weeks
+  const durationDays = Math.max(0, daysBetween(project.startDate, project.endDate));
+  const durationWeeks = Math.ceil(durationDays / 7);
 
   return (
     <AppShell>
@@ -272,16 +318,16 @@ export default function ProjectDetailPage() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <Card className="p-5 border-primary/30 bg-primary/5">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <UserCog className="h-5 w-5 text-primary" /> Assigner un manager
+              <UserCog className="h-5 w-5 text-primary" /> Assigner un chef de projet
             </h3>
             <div className="flex flex-wrap gap-3 items-center">
               <Select value={selectedManager} onValueChange={setSelectedManager}>
                 <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Choisir un manager..." />
+                  <SelectValue placeholder="Choisir un chef de projet..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {managers.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name} — {m.jobTitle}</SelectItem>
+                  {chefs.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -303,12 +349,13 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Tabs */}
-      <Tabs defaultValue="info" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="info" className="gap-1.5"><Info className="h-4 w-4" /> Informations</TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="h-4 w-4" /> Calendrier</TabsTrigger>
           <TabsTrigger value="gantt" className="gap-1.5"><GanttChartSquare className="h-4 w-4" /> Gantt</TabsTrigger>
           <TabsTrigger value="progress" className="gap-1.5"><BarChart3 className="h-4 w-4" /> Avancement</TabsTrigger>
-          <TabsTrigger value="channels" className="gap-1.5"><MessageSquare className="h-4 w-4" /> Discussions</TabsTrigger>
+          <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="h-4 w-4" /> Tâches</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5"><UserCircle className="h-4 w-4" /> Équipe</TabsTrigger>
           <TabsTrigger value="modifications" className="gap-1.5">
             <Edit3 className="h-4 w-4" /> Modifications
@@ -328,11 +375,44 @@ export default function ProjectDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InfoRow icon={Calendar} label="Date de début" value={formatDate(project.startDate)} />
                 <InfoRow icon={Calendar} label="Date de fin" value={formatDate(project.endDate)} />
+                <InfoRow icon={Clock} label="Durée" value={`${durationDays} jours (${durationWeeks} semaine${durationWeeks > 1 ? 's' : ''})`} />
                 <InfoRow icon={Euro} label="Budget" value={formatCurrency(project.budget)} />
-                <InfoRow icon={FolderKanban} label="Durée" value={`${daysBetween(project.startDate, project.endDate)} jours`} />
-                <InfoRow icon={Users} label="Membres" value={`${teamMembers.length} personnes`} />
-                <InfoRow icon={Calendar} label="Créé le" value={formatDate(project.createdAt)} />
+                <InfoRow icon={FolderKanban} label="Semaines de réalisation" value={`${durationWeeks} semaine${durationWeeks > 1 ? 's' : ''}`} />
+                <InfoRow icon={CalendarClock} label="Mise à jour" value={formatDate(project.createdAt)} />
               </div>
+
+              {/* Submission detail fields */}
+              {(project.platformUsers || project.desiredFeatures || project.necessaryPages || project.plannedFeatures) && (
+                <div className="mt-5 pt-5 border-t border-border space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" /> Détails de la soumission
+                  </h4>
+                  {project.platformUsers && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Utilisateurs de la plateforme</p>
+                      <p className="text-sm">{project.platformUsers}</p>
+                    </div>
+                  )}
+                  {project.desiredFeatures && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Fonctionnalités souhaitées</p>
+                      <p className="text-sm">{project.desiredFeatures}</p>
+                    </div>
+                  )}
+                  {project.necessaryPages && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Pages nécessaires pour le projet</p>
+                      <p className="text-sm">{project.necessaryPages}</p>
+                    </div>
+                  )}
+                  {project.plannedFeatures && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Fonctionnalités prévues</p>
+                      <p className="text-sm">{project.plannedFeatures}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Attachments */}
               {project.attachments.length > 0 && (
@@ -367,12 +447,8 @@ export default function ProjectDetailPage() {
                             </p>
                           )}
                         </div>
-                        {canViewAttachments && (
-                          <Download className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        )}
-                        {!canViewAttachments && (
-                          <Lock className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
-                        )}
+                        {canViewAttachments && <Download className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                        {!canViewAttachments && <Lock className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />}
                       </div>
                     ))}
                   </div>
@@ -414,41 +490,109 @@ export default function ProjectDetailPage() {
             </Card>
 
             <Card className="p-5">
-              <h3 className="font-semibold mb-4">Sous-tâches ({project.subtasks.length})</h3>
-              {project.subtasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">Aucune sous-tâche pour l'instant.</p>
-              ) : (
-                <div className="space-y-3">
-                  {project.subtasks.slice(0, 6).map((st) => {
-                    const assignee = getUser(users, st.assignedToId);
-                    return (
-                      <div key={st.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{st.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{assignee?.name ?? 'Non assigné'}</p>
-                        </div>
-                        <SubtaskStatusBadge status={st.status} />
-                        {canManage && st.status === 'review' && (
-                          <Button
-                            size="sm"
-                            className="h-7 text-xs gap-1 bg-success hover:bg-success/90"
-                            onClick={() => approveSubtask(project.id, st.id)}
-                          >
-                            <Check className="h-3.5 w-3.5" /> Valider
-                          </Button>
-                        )}
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" /> Calendrier du projet
+              </h3>
+              <div className="space-y-2 mb-4">
+                {project.calendarEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucun événement planifié pour l’instant.</p>
+                ) : (
+                  project.calendarEvents.map((ev) => (
+                    <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+                      <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{ev.title}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(ev.date)}</p>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Client meeting after framing */}
+              {project.clientMeeting ? (
+                <div className="p-3 rounded-lg bg-success/10 border border-success/30">
+                  <p className="text-sm font-medium flex items-center gap-1.5 text-success">
+                    <CheckCircle2 className="h-4 w-4" /> Rendez-vous client planifié
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{formatDateTime(project.clientMeeting.date)}</p>
+                  {project.clientMeeting.note && (
+                    <p className="text-xs text-muted-foreground mt-1">« {project.clientMeeting.note} »</p>
+                  )}
                 </div>
-              )}
-              {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
-                <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => setNewSubtaskOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Ajouter une sous-tâche
+              ) : canManage && project.subtasks.length > 0 ? (
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setMeetingOpen(true)}>
+                  <CalendarDays className="h-4 w-4 mr-2" /> Planifier un rendez-vous client (rapport)
                 </Button>
-              )}
+              ) : null}
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ---- Calendar tab ---- */}
+        <TabsContent value="calendar">
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" /> Calendrier synchronisé avec le cadrage des tâches
+              </h3>
+              {canManage && (
+                <Button variant="outline" size="sm" onClick={() => setMeetingOpen(true)}>
+                  <CalendarDays className="h-4 w-4 mr-2" /> Planifier un rendez-vous client
+                </Button>
+              )}
+            </div>
+
+            {project.calendarEvents.length === 0 && project.subtasks.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <CalendarClock className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p>Aucun événement de cadrage planifié. Le calendrier se remplira une fois le cadrage des tâches effectué.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Timeline of events + tasks */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Événements du projet</h4>
+                    <div className="space-y-2">
+                      {project.calendarEvents.map((ev) => (
+                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
+                          <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                            ev.type === 'rendez_vous' ? 'bg-primary/10 text-primary' : ev.type === 'cadrage' ? 'bg-info/10 text-info' : ev.type === 'livraison' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
+                            <CalendarDays className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{ev.title}</p>
+                            <p className="text-xs text-muted-foreground">{formatDateTime(ev.date)}</p>
+                            {ev.description && <p className="text-xs text-muted-foreground mt-0.5">{ev.description}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Sous-tâches (cadrage)</h4>
+                    <div className="space-y-2">
+                      {project.subtasks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucune sous-tâche définie.</p>
+                      ) : project.subtasks.map((st) => (
+                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
+                          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                            <ListTodo className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{st.title}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(st.startDate)} → {formatDate(st.dueDate)}</p>
+                          </div>
+                          <SubtaskStatusBadge status={st.status} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         {/* ---- Gantt tab ---- */}
@@ -474,7 +618,7 @@ export default function ProjectDetailPage() {
         <TabsContent value="progress">
           <div>
             <Card className="p-5">
-              <h3 className="font-semibold mb-4">Courbe d'avancement</h3>
+              <h3 className="font-semibold mb-4">Courbe d’avancement</h3>
               <Suspense fallback={<div className="h-48 flex items-center justify-center text-muted-foreground text-sm">Chargement du graphique...</div>}>
                 <ProgressChart data={project.progressTimeline} />
               </Suspense>
@@ -482,42 +626,85 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ---- Channels tab ---- */}
-        <TabsContent value="channels">
+        {/* ---- Tasks tab (with comments) ---- */}
+        <TabsContent value="tasks">
           <div>
-            {project.channels.length === 0 ? (
-              <Card className="p-8 text-center text-muted-foreground">
-                <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Aucun canal de discussion disponible pour ce projet.</p>
-              </Card>
-            ) : (
-              <Tabs defaultValue={groupChannel?.id ?? clientAdminChannel?.id ?? ''}>
-                <TabsList className="mb-4">
-                  {groupChannel && <TabsTrigger value={groupChannel.id}>Canal Groupe Projet</TabsTrigger>}
-                  {clientAdminChannel && (user.role === 'admin' || user.role === 'client') && (
-                    <TabsTrigger value={clientAdminChannel.id}>Canal Client ↔ Admin</TabsTrigger>
-                  )}
-                </TabsList>
-                {groupChannel && (
-                  <TabsContent value={groupChannel.id}>
-                    <Card className="overflow-hidden h-[600px] flex flex-col">
-                      <Suspense fallback={<div className="h-full flex items-center justify-center text-muted-foreground text-sm">Chargement des messages...</div>}>
-                        <DiscussionChannel channel={groupChannel} />
-                      </Suspense>
-                    </Card>
-                  </TabsContent>
-                )}
-                {clientAdminChannel && (user.role === 'admin' || user.role === 'client') && (
-                  <TabsContent value={clientAdminChannel.id}>
-                    <Card className="overflow-hidden h-[600px] flex flex-col">
-                      <Suspense fallback={<div className="h-full flex items-center justify-center text-muted-foreground text-sm">Chargement des messages...</div>}>
-                        <DiscussionChannel channel={clientAdminChannel} />
-                      </Suspense>
-                    </Card>
-                  </TabsContent>
-                )}
-              </Tabs>
+            {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
+              <div className="mb-4 flex justify-end">
+                <Button onClick={() => setNewSubtaskOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Ajouter une sous-tâche
+                </Button>
+              </div>
             )}
+            <div className="space-y-3">
+              {project.subtasks.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                  <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p>Aucune sous-tâche définie. Le chef de projet ou l’admin doit cadrer les tâches.</p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {project.subtasks.map((st) => {
+                    const assignee = getUser(users, st.assignedToId);
+                    return (
+                      <Card key={st.id} className="p-4 hover:shadow-md transition-all">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-sm">{st.title}</p>
+                              <SubtaskStatusBadge status={st.status} />
+                              <PriorityBadge priority={st.priority} />
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{st.description}</p>
+                            <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(st.startDate)} → {formatDate(st.dueDate)}</span>
+                              <span className="flex items-center gap-1"><UserIcon className="h-3.5 w-3.5" /> {assignee?.name ?? 'Non assigné'}</span>
+                              <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> {st.comments.length} commentaire{st.comments.length > 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="mt-3 w-48">
+                              <ProgressBar value={st.progress} indicatorClassName={st.progress < 33 ? 'bg-destructive' : st.progress < 66 ? 'bg-warning' : 'bg-success'} />
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2 items-end">
+                            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => { setDiscussionSubtask(st); setActiveTab('tasks'); }}>
+                              <MessageSquare className="h-3.5 w-3.5" /> Discussion
+                            </Button>
+                            {canManage && st.status === 'review' && (
+                              <Button size="sm" className="h-8 text-xs gap-1 bg-success hover:bg-success/90" onClick={() => approveSubtask(project.id, st.id)}>
+                                <Check className="h-3.5 w-3.5" /> Valider
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Inline comments preview */}
+                        {st.comments.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                            {st.comments.slice(0, 2).map((c) => {
+                              const author = getUser(users, c.authorId);
+                              return (
+                                <div key={c.id} className="flex items-start gap-2">
+                                  <UserAvatar user={author} size="sm" />
+                                  <div className="flex-1">
+                                    <p className="text-xs"><span className="font-semibold">{author?.name}</span> <span className="text-muted-foreground">· {formatDate(c.createdAt)}</span></p>
+                                    <p className="text-sm mt-0.5">{c.content}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {st.comments.length > 2 && (
+                              <button className="text-xs text-primary hover:underline" onClick={() => setDiscussionSubtask(st)}>
+                                Voir les {st.comments.length} commentaires
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </TabsContent>
 
@@ -526,7 +713,7 @@ export default function ProjectDetailPage() {
           <div>
             {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
               <div className="mb-4 flex justify-end">
-                <Button onClick={() => setAddMemberOpen(true)} disabled={availableEmployees.length === 0}>
+                <Button onClick={() => setAddMemberOpen(true)}>
                   <UserPlus className="h-4 w-4 mr-2" /> Ajouter un membre
                 </Button>
               </div>
@@ -535,7 +722,7 @@ export default function ProjectDetailPage() {
               <AnimatePresence mode="popLayout">
                 {teamMembers.map((m) => (
                   <motion.div key={m.userId} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
-                    <Card className="p-5 group">
+                    <Card className="p-5 group cursor-pointer" onClick={() => m.user && setProfileUser(m.user)}>
                       <div className="flex items-start gap-3">
                         <UserAvatar user={m.user} size="lg" />
                         <div className="flex-1 min-w-0">
@@ -548,11 +735,10 @@ export default function ProjectDetailPage() {
                           )}
                           <div className="mt-2 flex flex-wrap gap-2">
                             <RoleBadge role={m.role} />
-                            {m.user?.jobTitle && <span className="text-xs text-muted-foreground">{m.user.jobTitle}</span>}
+                            {m.user?.memberSpecialty && <span className="text-xs text-muted-foreground">{specialtyMeta[m.user.memberSpecialty]?.label ?? m.user.memberSpecialty}</span>}
                           </div>
-                          {m.user?.availability && <div className="mt-2"><AvailabilityBadge availability={m.user.availability} /></div>}
                         </div>
-                        {canManage && m.role === 'employee' && (
+                        {canManage && m.role !== 'client' && m.role !== 'admin' && m.userId !== user.id && (
                           <button
                             onClick={() => removeProjectMember(project.id, m.userId)}
                             className="opacity-0 group-hover:opacity-100 h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all flex-shrink-0"
@@ -561,8 +747,6 @@ export default function ProjectDetailPage() {
                           </button>
                         )}
                       </div>
-
-                      {/* Contact info */}
                       <div className="mt-3 pt-3 border-t border-border space-y-1.5">
                         {m.user?.phone && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -575,16 +759,6 @@ export default function ProjectDetailPage() {
                           </div>
                         )}
                       </div>
-
-                      {m.user?.workload !== undefined && (
-                        <div className="mt-4">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs text-muted-foreground">Charge de travail</span>
-                            <span className="text-xs font-bold">{m.user.workload}%</span>
-                          </div>
-                          <ProgressBar value={m.user.workload} indicatorClassName={m.user.workload > 80 ? 'bg-destructive' : m.user.workload > 50 ? 'bg-warning' : 'bg-success'} />
-                        </div>
-                      )}
                     </Card>
                   </motion.div>
                 ))}
@@ -608,15 +782,10 @@ export default function ProjectDetailPage() {
                   const reviewer = mod.reviewedById ? getUser(users, mod.reviewedById) : null;
                   const subtask = mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId) : null;
                   return (
-                    <motion.div
-                      key={mod.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
+                    <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                       <Card className={`p-5 ${mod.status === 'pending' ? 'border-warning/30' : mod.status === 'approved' ? 'border-success/30' : 'border-destructive/30'}`}>
                         <div className="flex items-start gap-4">
                           {requester && <UserAvatar user={requester} size="md" />}
-
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-2">
                               <span className="font-medium text-sm">{mod.requestedByName}</span>
@@ -628,7 +797,6 @@ export default function ProjectDetailPage() {
                               )}
                               <ModificationStatusBadge status={mod.status} />
                             </div>
-
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                               <div className="p-3 rounded-lg bg-muted/30">
                                 <p className="text-xs text-muted-foreground mb-1">Valeur actuelle — {fieldLabels[mod.field] ?? mod.field}</p>
@@ -639,13 +807,10 @@ export default function ProjectDetailPage() {
                                 <p className="text-sm line-clamp-2 font-medium">{mod.newValue}</p>
                               </div>
                             </div>
-
                             <div className="mt-3 flex items-start gap-2">
                               <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <p className="text-sm text-muted-foreground">{mod.reason}</p>
                             </div>
-
-                            {/* Review info */}
                             {mod.status !== 'pending' && reviewer && (
                               <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
                                 <Clock className="h-3.5 w-3.5" />
@@ -653,23 +818,12 @@ export default function ProjectDetailPage() {
                                 {mod.reviewNote && <span className="italic">— « {mod.reviewNote} »</span>}
                               </div>
                             )}
-
-                            {/* Admin review actions */}
                             {mod.status === 'pending' && user.role === 'admin' && (
                               <div className="mt-4 flex gap-2 pt-3 border-t border-border/50">
-                                <Button
-                                  size="sm"
-                                  className="bg-success hover:bg-success/90 h-8 gap-1.5"
-                                  onClick={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
-                                >
+                                <Button size="sm" className="bg-success hover:bg-success/90 h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}>
                                   <Check className="h-3.5 w-3.5" /> Approuver
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-8 gap-1.5"
-                                  onClick={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
-                                >
+                                <Button size="sm" variant="destructive" className="h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}>
                                   <XCircle className="h-3.5 w-3.5" /> Rejeter
                                 </Button>
                               </div>
@@ -736,8 +890,8 @@ export default function ProjectDetailPage() {
                 <Select value={newSubtask.assignedToId} onValueChange={(v) => setNewSubtask({ ...newSubtask, assignedToId: v })}>
                   <SelectTrigger><SelectValue placeholder="Non assigné" /></SelectTrigger>
                   <SelectContent>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.name} — {emp.jobTitle}</SelectItem>
+                    {members.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>{emp.name} — {emp.memberSpecialty ? (specialtyMeta[emp.memberSpecialty]?.label ?? emp.memberSpecialty) : ''}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -774,32 +928,97 @@ export default function ProjectDetailPage() {
 
       {/* Add member dialog */}
       <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" /> Ajouter un membre au projet
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-4">
-            {availableEmployees.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Tous les employés sont déjà membres de ce projet.</p>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setMemberForm({ ...memberForm, createNew: false })} className={cn('p-3 rounded-lg border text-sm font-medium transition-all', !memberForm.createNew ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>
+                Sélectionner un membre existant
+              </button>
+              <button type="button" onClick={() => setMemberForm({ ...memberForm, createNew: true })} className={cn('p-3 rounded-lg border text-sm font-medium transition-all', memberForm.createNew ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>
+                Créer un nouveau compte
+              </button>
+            </div>
+
+            {memberForm.createNew ? (
+              <div className="space-y-3">
+                <div>
+                  <Label>Nom complet *</Label>
+                  <Input value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} placeholder="Ex: Marie Dupont" />
+                </div>
+                <div>
+                  <Label>Email *</Label>
+                  <Input type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} placeholder="marie@entreprise.com" />
+                </div>
+                <div>
+                  <Label>Mot de passe *</Label>
+                  <Input type="text" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Mot de passe du compte" />
+                </div>
+                <div>
+                  <Label>Rôle dans le projet</Label>
+                  <Select value={memberForm.role} onValueChange={(v) => setMemberForm({ ...memberForm, role: v as Role })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="membre">Membre du projet</SelectItem>
+                      <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {memberForm.role === 'membre' && (
+                  <div>
+                    <Label>Spécialité</Label>
+                    <Select value={memberForm.specialty} onValueChange={(v) => setMemberForm({ ...memberForm, specialty: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'].map((s) => (
+                          <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div>
-                <Label>Sélectionner un employé</Label>
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger><SelectValue placeholder="Choisir un employé..." /></SelectTrigger>
-                  <SelectContent>
-                    {availableEmployees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.name} — {emp.jobTitle}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-3">
+                {availableEmployees.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Tous les membres sont déjà dans ce projet.</p>
+                ) : (
+                  <>
+                    <div>
+                      <Label>Choisir un membre existant</Label>
+                      <Select value={memberForm.existingUserId} onValueChange={(v) => setMemberForm({ ...memberForm, existingUserId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Choisir un membre..." /></SelectTrigger>
+                        <SelectContent>
+                          {availableEmployees.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>{emp.name} — {emp.memberSpecialty ? (specialtyMeta[emp.memberSpecialty]?.label ?? emp.memberSpecialty) : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Rôle dans le projet</Label>
+                      <Select value={memberForm.role} onValueChange={(v) => setMemberForm({ ...memberForm, role: v as Role })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="membre">Membre du projet</SelectItem>
+                          <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddMemberOpen(false)}>Annuler</Button>
-            <Button onClick={handleAddMember} disabled={!selectedEmployee}>Ajouter</Button>
+            <Button onClick={handleAddMember} disabled={memberForm.createNew ? (!memberForm.name || !memberForm.email || !memberForm.password) : !memberForm.existingUserId}>
+              Ajouter
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -828,11 +1047,7 @@ export default function ProjectDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReviewDialog(null)}>Annuler</Button>
-            <Button
-              onClick={handleReview}
-              className={reviewDialog?.decision === 'approved' ? 'bg-success hover:bg-success/90' : ''}
-              variant={reviewDialog?.decision === 'rejected' ? 'destructive' : 'default'}
-            >
+            <Button onClick={handleReview} className={reviewDialog?.decision === 'approved' ? 'bg-success hover:bg-success/90' : ''} variant={reviewDialog?.decision === 'rejected' ? 'destructive' : 'default'}>
               {reviewDialog?.decision === 'approved' ? 'Confirmer l\'approbation' : 'Confirmer le rejet'}
             </Button>
           </DialogFooter>
@@ -851,41 +1066,19 @@ export default function ProjectDetailPage() {
             {user.role !== 'admin' && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
-                <p>Votre demande sera examinée par un administrateur. Vous recevrez une notification dès qu'elle sera traitée.</p>
+                <p>Votre demande sera examinée par un administrateur. Vous recevrez une notification dès qu’elle sera traitée.</p>
               </div>
             )}
-            {/* Target selection: project or subtask */}
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setModReq({ ...modReq, target: 'project', subtaskId: '' })}
-                className={cn(
-                  'p-3 rounded-lg border text-sm font-medium transition-all text-left',
-                  modReq.target === 'project'
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-border hover:border-border/80 text-muted-foreground',
-                )}
-              >
+              <button type="button" onClick={() => setModReq({ ...modReq, target: 'project', subtaskId: '' })} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left', modReq.target === 'project' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
                 <FolderKanban className="h-4 w-4 mb-1.5" />
                 Le projet
               </button>
-              <button
-                type="button"
-                onClick={() => setModReq({ ...modReq, target: 'subtask' })}
-                disabled={project.subtasks.length === 0}
-                className={cn(
-                  'p-3 rounded-lg border text-sm font-medium transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed',
-                  modReq.target === 'subtask'
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-border hover:border-border/80 text-muted-foreground',
-                )}
-              >
+              <button type="button" onClick={() => setModReq({ ...modReq, target: 'subtask' })} disabled={project.subtasks.length === 0} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed', modReq.target === 'subtask' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
                 <ListTodo className="h-4 w-4 mb-1.5" />
                 Une sous-tâche
               </button>
             </div>
-
-            {/* Subtask selector */}
             {modReq.target === 'subtask' && (
               <div>
                 <Label>Sous-tâche à modifier</Label>
@@ -899,14 +1092,9 @@ export default function ProjectDetailPage() {
                 </Select>
               </div>
             )}
-
-            {/* Field selector */}
             <div>
               <Label>Champ à modifier</Label>
-              <Select
-                value={modReq.field}
-                onValueChange={(v) => setModReq({ ...modReq, field: v, newValue: '' })}
-              >
+              <Select value={modReq.field} onValueChange={(v) => setModReq({ ...modReq, field: v, newValue: '' })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(modReq.target === 'project' ? projectFields : subtaskFields).map((f) => (
@@ -915,8 +1103,6 @@ export default function ProjectDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* New value */}
             <div>
               <Label>Nouvelle valeur</Label>
               {(modReq.field === 'priority') ? (
@@ -930,53 +1116,104 @@ export default function ProjectDetailPage() {
                   </SelectContent>
                 </Select>
               ) : (modReq.field === 'endDate' || modReq.field === 'dueDate') ? (
-                <Input
-                  type="date"
-                  value={modReq.newValue}
-                  onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })}
-                />
+                <Input type="date" value={modReq.newValue} onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })} />
               ) : modReq.field === 'budget' ? (
-                <Input
-                  type="number"
-                  value={modReq.newValue}
-                  onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })}
-                  placeholder="Ex: 50000"
-                />
+                <Input type="number" value={modReq.newValue} onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })} placeholder="Ex: 50000" />
               ) : modReq.field === 'description' ? (
-                <Textarea
-                  value={modReq.newValue}
-                  onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })}
-                  placeholder="Nouvelle description..."
-                  rows={3}
-                />
+                <Textarea value={modReq.newValue} onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })} placeholder="Nouvelle description..." rows={3} />
               ) : (
-                <Input
-                  value={modReq.newValue}
-                  onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })}
-                  placeholder="Nouvelle valeur..."
-                />
+                <Input value={modReq.newValue} onChange={(e) => setModReq({ ...modReq, newValue: e.target.value })} placeholder="Nouvelle valeur..." />
               )}
             </div>
-
-            {/* Reason */}
             <div>
               <Label>Raison de la modification *</Label>
-              <Textarea
-                value={modReq.reason}
-                onChange={(e) => setModReq({ ...modReq, reason: e.target.value })}
-                placeholder="Expliquez pourquoi cette modification est nécessaire..."
-                rows={3}
-              />
+              <Textarea value={modReq.reason} onChange={(e) => setModReq({ ...modReq, reason: e.target.value })} placeholder="Expliquez pourquoi cette modification est nécessaire..." rows={3} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModReqOpen(false)}>Annuler</Button>
-            <Button
-              onClick={handleSubmitModification}
-              disabled={!modReq.newValue || !modReq.reason || (modReq.target === 'subtask' && !modReq.subtaskId)}
-            >
+            <Button onClick={handleSubmitModification} disabled={!modReq.newValue || !modReq.reason || (modReq.target === 'subtask' && !modReq.subtaskId)}>
               <Send className="h-4 w-4 mr-2" /> Soumettre la demande
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task discussion dialog */}
+      <Dialog open={!!discussionSubtask} onOpenChange={(open) => { if (!open) { setDiscussionSubtask(null); setCommentText(''); } }}>
+        <DialogContent className="max-w-xl h-[70vh] flex flex-col">
+          {discussionSubtask && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" /> Discussion — {discussionSubtask.title}
+                </DialogTitle>
+              </DialogHeader>
+              {/* Task info */}
+              <div className="px-2 py-3 rounded-lg bg-muted/40 border border-border/50">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span><span className="font-medium text-foreground">Assigné :</span> {getUser(users, discussionSubtask.assignedToId)?.name ?? 'Non assigné'}</span>
+                  <span><span className="font-medium text-foreground">Statut :</span> <SubtaskStatusBadge status={discussionSubtask.status} /></span>
+                  <span><span className="font-medium text-foreground">Dates :</span> {formatDate(discussionSubtask.startDate)} → {formatDate(discussionSubtask.dueDate)}</span>
+                  <span><span className="font-medium text-foreground">Progression :</span> {discussionSubtask.progress}%</span>
+                </div>
+              </div>
+              {/* Comments */}
+              <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3 my-4 px-1">
+                {discussionSubtask.comments.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-8">Aucun commentaire pour l’instant. Lancez la discussion !</p>
+                ) : discussionSubtask.comments.map((c) => {
+                  const author = getUser(users, c.authorId);
+                  const isMine = c.authorId === user.id;
+                  return (
+                    <div key={c.id} className={cn('flex items-start gap-2', isMine && 'flex-row-reverse')}>
+                      <UserAvatar user={author} size="sm" />
+                      <div className={cn('max-w-[80%] p-3 rounded-xl', isMine ? 'bg-primary text-primary-foreground' : 'bg-muted/50 border border-border/50')}>
+                        <p className={cn('text-xs font-semibold', isMine ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                          {author?.name} · {formatDate(c.createdAt)}
+                        </p>
+                        <p className="text-sm mt-1">{c.content}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Input */}
+              <div className="flex items-center gap-2 border-t border-border pt-3">
+                <Textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Écrivez un commentaire..." rows={2} className="resize-none" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendComment(); } }} />
+                <Button onClick={handleSendComment} disabled={!commentText.trim()} className="shrink-0">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Client meeting dialog */}
+      <Dialog open={meetingOpen} onOpenChange={setMeetingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" /> Planifier un rendez-vous client (rapport)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <p className="text-xs text-muted-foreground">
+              Une fois le cadrage des tâches terminé, planifiez un rendez-vous avec le client pour présenter le rapport et valider le périmètre.
+            </p>
+            <div>
+              <Label>Date et heure du rendez-vous</Label>
+              <Input type="datetime-local" value={meetingForm.date} onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })} />
+            </div>
+            <div>
+              <Label>Note (facultatif)</Label>
+              <Textarea value={meetingForm.note} onChange={(e) => setMeetingForm({ ...meetingForm, note: e.target.value })} rows={3} placeholder="Ex: Présentation du rapport de cadrage et validation du périmètre" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMeetingOpen(false)}>Annuler</Button>
+            <Button onClick={handleAddMeeting} disabled={!meetingForm.date}>Planifier</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1001,11 +1238,7 @@ export default function ProjectDetailPage() {
                 </div>
                 <p className="text-sm font-medium">{fileViewer?.fileName}</p>
                 <p className="text-xs text-muted-foreground">Ce type de fichier ne peut pas être prévisualisé.</p>
-                <Button
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => fileViewer && window.open(fileViewer.url, '_blank')}
-                >
+                <Button size="sm" className="mt-2" onClick={() => fileViewer && window.open(fileViewer.url, '_blank')}>
                   <Download className="h-3.5 w-3.5 mr-2" /> Télécharger le fichier
                 </Button>
               </div>
@@ -1013,6 +1246,14 @@ export default function ProjectDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Member profile dialog */}
+      <MemberProfileDialog
+        user={profileUser}
+        open={!!profileUser}
+        onOpenChange={(o) => { if (!o) setProfileUser(null); }}
+        canEdit={user.role === 'admin'}
+      />
     </AppShell>
   );
 }

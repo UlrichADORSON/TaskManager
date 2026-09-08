@@ -22,10 +22,10 @@ export function UserContactHoverCard({ user, children }: { user: User | undefine
           </div>
         </div>
         <div className="space-y-1.5">
-          {user.jobTitle && (
+          {user.memberSpecialty && (
             <div className="flex items-center gap-2 text-xs">
               <Briefcase className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <span className="truncate">{user.jobTitle}</span>
+              <span className="truncate">{user.memberSpecialty}</span>
             </div>
           )}
           {user.company && (

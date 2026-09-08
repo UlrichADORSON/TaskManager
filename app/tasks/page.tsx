@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
-  CheckSquare, Calendar, Paperclip, Play, Pause, Edit3,
-  Clock, AlertCircle,
+  CheckSquare, Calendar, Paperclip, Edit3,
+  Clock, AlertCircle, MessageSquare, Play, Pause, Timer,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -25,11 +25,21 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { subtaskStatusMeta, formatDate, daysUntil } from '@/lib/status';
-import type { SubtaskStatus } from '@/types';
+import type { SubtaskStatus, WorkSession } from '@/types';
+
+function formatWorkTime(totalSeconds: number): string {
+  const secs = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m`;
+  if (m > 0) return `${m}m ${s.toString().padStart(2, '0')}s`;
+  return `${s}s`;
+}
 
 export default function TasksPage() {
   const user = useAuthGuard();
-  const { projects, updateSubtaskStatus, toggleTaskActive, suggestModification } = useApp();
+  const { projects, updateSubtaskStatus, suggestModification, toggleTaskActive } = useApp();
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -37,6 +47,22 @@ export default function TasksPage() {
   const [modDialogOpen, setModDialogOpen] = useState(false);
   const [modTarget, setModTarget] = useState<{ projectId: string; subtaskId: string; title: string; field: string; oldValue: string } | null>(null);
   const [modForm, setModForm] = useState({ field: 'description', newValue: '', reason: '' });
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const taskWorkSeconds = (task: { isActive?: boolean; workSessions?: WorkSession[] }): number => {
+    const sessions = task.workSessions ?? [];
+    const closed = sessions
+      .filter((s) => s.end !== null)
+      .reduce((acc, s) => acc + (s.duration || 0), 0);
+    const running = task.isActive ? sessions.find((s) => s.end === null) : undefined;
+    const runningSecs = running ? (now - new Date(running.start).getTime()) / 1000 : 0;
+    return closed + runningSecs;
+  };
 
   const myTasks = useMemo(() => {
     if (!user) return [];
@@ -104,7 +130,7 @@ export default function TasksPage() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Mes tâches assignées</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Utilisez le bouton <Play className="inline h-3 w-3" /> pour démarrer une tâche et <Pause className="inline h-3 w-3" /> pour la mettre en pause. L'admin doit valider toute modification suggérée.
+          Consultez vos tâches et suivez leur progression. Vous pouvez suggérer des modifications qui seront examinées par un chef de projet ou l’admin.
         </p>
       </motion.div>
 
@@ -154,18 +180,7 @@ export default function TasksPage() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3) }}
                 >
-                  <Card className={`p-5 hover:shadow-lg transition-all relative overflow-hidden ${task.isActive ? 'ring-2 ring-success/40 border-success/30' : ''}`}>
-                    {task.isActive && (
-                      <div className="absolute top-0 right-0 px-3 py-1 bg-success/10 text-success text-xs font-medium rounded-bl-lg flex items-center gap-1">
-                        <motion.span
-                          animate={{ opacity: [1, 0.3, 1] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                        >
-                          <span className="inline-block h-2 w-2 rounded-full bg-success" />
-                        </motion.span>
-                        En cours
-                      </div>
-                    )}
+                  <Card className={`p-5 hover:shadow-lg transition-all`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
                         <button onClick={() => router.push(`/projects/${task.projectId}`)} className="font-semibold text-sm hover:text-primary transition-colors text-left">
@@ -186,6 +201,7 @@ export default function TasksPage() {
                       {task.attachments.length > 0 && (
                         <span className="flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" />{task.attachments.length}</span>
                       )}
+                      <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" />{task.comments.length}</span>
                     </div>
 
                     <div className="mb-4">
@@ -194,28 +210,36 @@ export default function TasksPage() {
                         <span className="text-xs font-bold">{task.progress}%</span>
                       </div>
                       <ProgressBar value={task.progress} indicatorClassName={task.progress < 33 ? 'bg-destructive' : task.progress < 66 ? 'bg-warning' : 'bg-success'} />
+                      <div className={`mt-2 flex items-center gap-1.5 text-xs text-muted-foreground ${task.isActive ? 'text-primary' : ''}`}>
+                        <Timer className={`h-3.5 w-3.5 ${task.isActive ? 'animate-pulse' : ''}`} />
+                        <span>Temps de travail : <span className="font-medium">{formatWorkTime(taskWorkSeconds(task))}</span></span>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
                       <SubtaskStatusBadge status={task.status} />
 
-                      {/* Pause / Resume button */}
+                      {/* Pause / resume working session */}
                       {!isDone && (
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button
-                            size="sm"
-                            variant={task.isActive ? 'outline' : 'default'}
-                            className={`h-8 text-xs gap-1.5 ${task.isActive ? '' : 'bg-success hover:bg-success/90'}`}
-                            onClick={() => toggleTaskActive(task.projectId, task.id)}
-                          >
-                            {task.isActive ? (
-                              <><Pause className="h-3.5 w-3.5" /> Mettre en pause</>
-                            ) : (
-                              <><Play className="h-3.5 w-3.5" /> Reprendre</>
-                            )}
-                          </Button>
-                        </motion.div>
+                        <Button
+                          size="sm"
+                          variant={task.isActive ? 'destructive' : 'default'}
+                          className="h-8 text-xs gap-1.5"
+                          onClick={() => toggleTaskActive(task.projectId, task.id)}
+                        >
+                          {task.isActive ? (<><Pause className="h-3.5 w-3.5" /> Pause</>) : (<><Play className="h-3.5 w-3.5" /> Reprendre</>)}
+                        </Button>
                       )}
+
+                      {/* Discussion button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                        onClick={() => router.push(`/projects/${task.projectId}?tab=tasks`)}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" /> Discussion ({task.comments.length})
+                      </Button>
 
                       {/* Suggest modification button */}
                       {!isDone && (
@@ -263,7 +287,7 @@ export default function TasksPage() {
             <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
               <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground">
-                Votre suggestion sera examinée par un administrateur avant d'être appliquée. Le champ sera modifié uniquement après approbation.
+                Votre suggestion sera examinée par un administrateur avant d’être appliquée. Le champ sera modifié uniquement après approbation.
               </p>
             </div>
             <div>
