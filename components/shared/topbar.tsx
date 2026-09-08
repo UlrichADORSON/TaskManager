@@ -74,7 +74,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const handleLogout = () => {
     logout();
-    router.push('/');
+    router.push('/login');
   };
 
   return (

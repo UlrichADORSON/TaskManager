@@ -122,7 +122,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           {!collapsed && <span>Réduire</span>}
         </button>
         <button
-          onClick={() => { logout(); router.push('/'); }}
+          onClick={() => { logout(); router.push('/login'); }}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
         >
           <LogOut className="h-5 w-5 flex-shrink-0" />

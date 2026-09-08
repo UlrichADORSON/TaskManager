@@ -29,6 +29,7 @@ export interface User {
   email: string;
   role: Role;
   avatarUrl: string;
+  password?: string;         // demo auth (frontend-only prototype)
   jobTitle?: string;        // for employees / managers
   availability?: 'available' | 'busy' | 'unavailable';
   workload?: number;        // 0-100 percentage (employees)

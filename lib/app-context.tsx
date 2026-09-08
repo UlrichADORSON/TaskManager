@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   User, Project, AppNotification, Subtask, Message, SubtaskStatus,
   ProjectStatus, Channel, Attachment, ModificationRequest, ModificationStatus,
@@ -32,7 +32,8 @@ interface SuggestModificationData {
 
 interface AppState {
   currentUser: User | null;
-  setRole: (role: User['role']) => void;
+  sessionInitialized: boolean;
+  login: (email: string, password: string) => boolean;
   logout: () => void;
 
   users: User[];
@@ -61,6 +62,8 @@ interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
+const SESSION_KEY = 'activeUserId';
+
 export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useApp must be used within AppProvider');
@@ -69,16 +72,49 @@ export function useApp() {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
 
-  const setRole = useCallback((role: User['role']) => {
-    const user = users.find((u) => u.role === role);
-    if (user) setCurrentUser(user);
+  // Restore session from localStorage (frontend-only persistence)
+  useEffect(() => {
+    try {
+      const id = window.localStorage.getItem(SESSION_KEY);
+      if (id) {
+        const user = users.find((u) => u.id === id);
+        if (user) setCurrentUser(user);
+      }
+    } catch {
+      // storage unavailable (private mode, etc.)
+    } finally {
+      setSessionInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const login = useCallback((email: string, password: string): boolean => {
+    const user = users.find(
+      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
+    );
+    if (!user) return false;
+    setCurrentUser(user);
+    try {
+      window.localStorage.setItem(SESSION_KEY, user.id);
+    } catch {
+      // ignore storage errors
+    }
+    return true;
   }, [users]);
 
-  const logout = useCallback(() => setCurrentUser(null), []);
+  const logout = useCallback(() => {
+    setCurrentUser(null);
+    try {
+      window.localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   // ---- Project actions
   const submitProject: AppState['submitProject'] = useCallback((data) => {
@@ -483,7 +519,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AppState>(() => ({
-    currentUser, setRole, logout,
+    currentUser, sessionInitialized, login, logout,
     users, projects, notifications,
     submitProject, validateProject, rejectProject, assignManager,
     addProjectMember, removeProjectMember,
@@ -491,7 +527,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     suggestModification, reviewModification,
     addEmployee, updateProfile,
     sendMessage, markNotificationRead, markAllNotificationsRead,
-  }), [currentUser, setRole, logout, users, projects, notifications,
+  }), [currentUser, sessionInitialized, login, logout, users, projects, notifications,
        submitProject, validateProject, rejectProject, assignManager,
        addProjectMember, removeProjectMember,
 addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,

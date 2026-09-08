@@ -5,12 +5,12 @@ import { useEffect } from 'react';
 import { useApp } from '@/lib/app-context';
 
 export function useAuthGuard() {
-  const { currentUser } = useApp();
+  const { currentUser, sessionInitialized } = useApp();
   const router = useRouter();
   useEffect(() => {
-    if (!currentUser) {
-      router.replace('/');
+    if (!currentUser && sessionInitialized) {
+      router.replace('/login');
     }
-  }, [currentUser, router]);
+  }, [currentUser, sessionInitialized, router]);
   return currentUser;
 }

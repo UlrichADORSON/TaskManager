@@ -258,7 +258,7 @@ export default function SettingsPage() {
         <Button
           variant="outline"
           className="text-destructive hover:bg-destructive/5"
-          onClick={() => { logout(); router.push('/'); }}
+          onClick={() => { logout(); router.push('/login'); }}
         >
           <LogOut className="h-4 w-4 mr-2" /> Se déconnecter
         </Button>
