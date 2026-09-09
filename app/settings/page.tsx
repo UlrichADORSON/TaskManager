@@ -27,7 +27,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const user = useAuthGuard();
-  const { logout, users, updateProfile } = useApp();
+  const { logout, users, updateProfile, specialties } = useApp();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -187,8 +187,8 @@ export default function SettingsPage() {
                     <Select value={form.memberSpecialty || undefined} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
                       <SelectTrigger id="p-specialty"><SelectValue placeholder="Choisir une spécialité" /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(specialtyMeta).map(([key, meta]) => (
-                          <SelectItem key={key} value={key}>{meta.label}</SelectItem>
+                        {specialties.map((s) => (
+                          <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

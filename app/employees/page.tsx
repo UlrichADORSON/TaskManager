@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound, ArrowUpRight, Search } from 'lucide-react';
+import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound, ArrowUpRight, Search, Briefcase } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
@@ -23,15 +23,21 @@ import {
 import { cn } from '@/lib/utils';
 import type { MemberSpecialty, User } from '@/types';
 
-const SPECIALTIES: MemberSpecialty[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
-
 export default function EmployeesPage() {
   const user = useAuthGuard();
-  const { users, projects, addEmployee } = useApp();
+  const { users, projects, addEmployee, specialties, addSpecialty } = useApp();
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [posteOpen, setPosteOpen] = useState(false);
+  const [posteName, setPosteName] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const [form, setForm] = useState({
     name: '', email: '', password: '', phone: '',
@@ -44,12 +50,17 @@ export default function EmployeesPage() {
   const canManage = user?.role === 'admin' || user?.role === 'chef_de_projet';
 
   const visibleUsers = useMemo(() => {
-    if (!user) return [];
-    let list = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
-    if (specialtyFilter !== 'all') list = list.filter((u) => u.memberSpecialty === specialtyFilter);
-    if (search) list = list.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()) || (u.memberSpecialty ?? '').toLowerCase().includes(search.toLowerCase()));
-    return list;
-  }, [user, users, specialtyFilter, search]);
+    try {
+      if (!user) return [];
+      const q = debouncedSearch.trim().toLowerCase();
+      let list = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
+      if (specialtyFilter !== 'all') list = list.filter((u) => u.memberSpecialty === specialtyFilter);
+      if (q) list = list.filter((u) => u.name.toLowerCase().includes(q) || (u.memberSpecialty ?? '').toLowerCase().includes(q));
+      return list;
+    } catch {
+      return [];
+    }
+  }, [user, users, specialtyFilter, debouncedSearch]);
 
   const teamStats = useMemo(() => {
     const team = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
@@ -94,6 +105,14 @@ export default function EmployeesPage() {
     setPhotoPreview(undefined);
   };
 
+  const handleAddPoste = () => {
+    if (!posteName.trim()) return;
+    addSpecialty(posteName);
+    setSpecialtyFilter(posteName.trim());
+    setPosteOpen(false);
+    setPosteName('');
+  };
+
   const stats = [
     { badge: 'Équipe', badgeCls: 'bg-primary/10 text-primary', value: teamStats.teamCount, label: 'membres & chefs de projet' },
     { badge: 'En activité', badgeCls: 'bg-success/10 text-success', value: teamStats.activePersons, label: 'personnes en charge de tâches en cours' },
@@ -111,9 +130,18 @@ export default function EmployeesPage() {
           </p>
         </div>
         {canManage && (
-          <Button onClick={() => setAddOpen(true)} className="rounded-full gap-1.5 shadow-[0_8px_20px_rgba(46,152,255,0.35)]">
-            <UserPlus className="h-4 w-4" /> Ajouter un membre
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <Button onClick={() => setAddOpen(true)} className="rounded-full gap-1.5 shadow-[0_8px_20px_rgba(46,152,255,0.35)]">
+              <UserPlus className="h-4 w-4" /> Ajouter un membre
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setPosteOpen(true)}
+              className="rounded-full gap-1.5 border-primary/25 bg-card text-foreground hover:bg-primary/5 hover:border-primary/40 shadow-[0_6px_18px_rgba(46,152,255,0.12)]"
+            >
+              <Briefcase className="h-4 w-4" /> Créer un poste
+            </Button>
+          </div>
         )}
       </div>
 
@@ -133,14 +161,16 @@ export default function EmployeesPage() {
 
       {/* Filtres en capsules */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-8">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full lg:w-[560px] lg:shrink-0">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher une personne…"
-            className="w-full pl-11 pr-9 py-2.5 rounded-full bg-card border border-border/60 text-sm shadow-card outline-none placeholder:text-muted-foreground focus:border-primary/40 transition-colors"
+            autoComplete="off"
+            name="employee-search"
+            placeholder="Rechercher une personne ou un poste…"
+            className="w-full h-12 pl-12 pr-10 rounded-full bg-card border border-border/60 text-sm text-foreground caret-primary shadow-card outline-none placeholder:text-muted-foreground focus:border-primary/40 transition-colors"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -148,8 +178,8 @@ export default function EmployeesPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {['all', ...SPECIALTIES].map((s) => {
+        <div className="flex items-center gap-1.5 overflow-x-auto flex-nowrap py-1 pr-1 -mx-1 px-1 scrollbar-thin">
+          {['all', ...specialties].map((s) => {
             const active = specialtyFilter === s;
             return (
               <button
@@ -377,7 +407,7 @@ export default function EmployeesPage() {
                   <Select value={form.memberSpecialty} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {SPECIALTIES.map((s) => (
+                      {specialties.map((s) => (
                         <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -394,6 +424,40 @@ export default function EmployeesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create poste dialog */}
+      <Dialog open={posteOpen} onOpenChange={setPosteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" /> Créer un poste
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-xs text-muted-foreground">
+              Le poste sera ajouté au filtre de l’équipe et pourra être attribué aux membres.
+            </p>
+            <div>
+              <Label htmlFor="poste-name">Nom du poste *</Label>
+              <Input
+                id="poste-name"
+                value={posteName}
+                onChange={(e) => setPosteName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddPoste(); }}
+                placeholder="Ex: Commercial, Graphiste, Référent SEO…"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPosteOpen(false); setPosteName(''); }}>Annuler</Button>
+            <Button onClick={handleAddPoste} disabled={!posteName.trim()}>
+              <Briefcase className="h-4 w-4 mr-2" /> Créer le poste
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     {/* Member detail dialog */}
       <MemberProfileDialog
         user={selectedUser}

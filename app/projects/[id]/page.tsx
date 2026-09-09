@@ -35,6 +35,7 @@ import {
 } from '@/components/shared/badges';
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
+import { ProjectCalendar } from '@/components/shared/project-calendar';
 import { ProgressBar, ProgressRing } from '@/components/shared/progress';
 import { StatCard } from '@/components/shared/stat-card';
 import {
@@ -52,6 +53,7 @@ export default function ProjectDetailPage() {
     suggestModification, approveSubtask, addSubtaskComment,
     scheduleClientMeeting,
     addEmployee: addEmployeeFromContext,
+    specialties,
   } = useApp();
   const router = useRouter();
   const params = useParams();
@@ -507,7 +509,7 @@ export default function ProjectDetailPage() {
                   <p className="text-sm text-muted-foreground">Aucun événement planifié pour l’instant.</p>
                 ) : (
                   project.calendarEvents.map((ev) => (
-                    <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+                    <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-[10px] border border-border/40 bg-[#F7FAFD]">
                       <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{ev.title}</p>
@@ -520,7 +522,7 @@ export default function ProjectDetailPage() {
 
               {/* Client meeting after framing */}
               {project.clientMeeting ? (
-                <div className="p-3 rounded-lg bg-success/10 border border-success/30">
+                <div className="p-3 rounded-[10px] bg-success/10 border border-success/30">
                   <p className="text-sm font-medium flex items-center gap-1.5 text-success">
                     <CheckCircle2 className="h-4 w-4" /> Rendez-vous client planifié
                   </p>
@@ -558,22 +560,25 @@ export default function ProjectDetailPage() {
                 <p>Aucun événement de cadrage planifié. Le calendrier se remplira une fois le cadrage des tâches effectué.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Timeline of events + tasks */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+                {/* Calendrier mensuel */}
+                <ProjectCalendar events={project.calendarEvents} subtasks={project.subtasks} className="w-full xl:sticky xl:top-24" />
+
+                {/* Événements du projet + sous-tâches (cadrage) — colonne de droite sur écran large */}
+                <div className="space-y-5">
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-3">Événements du projet</h4>
                     <div className="space-y-2">
                       {project.calendarEvents.map((ev) => (
-                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
-                          <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0',
-                            ev.type === 'rendez_vous' ? 'bg-primary/10 text-primary' : ev.type === 'cadrage' ? 'bg-info/10 text-info' : ev.type === 'livraison' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
+                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-[#F7FAFD]">
+                          <div className={cn('h-9 w-9 rounded-[12px] flex items-center justify-center flex-shrink-0',
+                            ev.type === 'rendez_vous' ? 'bg-primary text-white' : ev.type === 'cadrage' ? 'bg-info text-white' : ev.type === 'livraison' ? 'bg-success text-white' : 'bg-muted text-muted-foreground')}>
                             <CalendarDays className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{ev.title}</p>
+                            <p className="text-sm font-medium line-clamp-1">{ev.title}</p>
                             <p className="text-xs text-muted-foreground">{formatDateTime(ev.date)}</p>
-                            {ev.description && <p className="text-xs text-muted-foreground mt-0.5">{ev.description}</p>}
+                            {ev.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ev.description}</p>}
                           </div>
                         </div>
                       ))}
@@ -585,8 +590,8 @@ export default function ProjectDetailPage() {
                       {project.subtasks.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucune sous-tâche définie.</p>
                       ) : project.subtasks.map((st) => (
-                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
-                          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-[#F7FAFD]">
+                          <div className="h-9 w-9 rounded-[12px] bg-primary text-white flex items-center justify-center flex-shrink-0">
                             <ListTodo className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1040,7 +1045,7 @@ export default function ProjectDetailPage() {
                     <Select value={memberForm.specialty} onValueChange={(v) => setMemberForm({ ...memberForm, specialty: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'].map((s) => (
+                        {specialties.map((s) => (
                           <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
                         ))}
                       </SelectContent>

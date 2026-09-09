@@ -21,8 +21,6 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { User, Role, MemberSpecialty } from '@/types';
 
-const SPECIALTIES: MemberSpecialty[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
-
 const roleLabel: Record<Role, string> = {
   admin: 'Admin',
   chef_de_projet: 'Chef de projet',
@@ -38,7 +36,7 @@ interface MemberProfileDialogProps {
 }
 
 export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false }: MemberProfileDialogProps) {
-  const { users, projects, updateUser } = useApp();
+  const { users, projects, updateUser, specialties } = useApp();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: '', email: '', phone: '', company: '', address: '', bio: '',
@@ -305,7 +303,7 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
                             <Select value={form.memberSpecialty || undefined} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
                               <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
                               <SelectContent>
-                                {SPECIALTIES.map((s) => (
+                                {specialties.map((s) => (
                                   <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
                                 ))}
                               </SelectContent>
