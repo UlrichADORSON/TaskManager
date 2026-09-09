@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 
 const ContextMenu = ContextMenuPrimitive.Root;
 
+
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 
 const ContextMenuGroup = ContextMenuPrimitive.Group;
@@ -23,7 +24,7 @@ const ContextMenuSubTrigger = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
     inset?: boolean;
   }
->(({ className, inset, children, ...props }, ref) => (
+>(({ className, inset, children, ...props }: any, ref: any) => (
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
@@ -76,7 +77,7 @@ const ContextMenuItem = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
     inset?: boolean;
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, ...props }: any, ref: any) => (
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
