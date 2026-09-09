@@ -43,7 +43,9 @@ interface AppState {
   users: User[];
   projects: Project[];
   notifications: AppNotification[];
+  specialties: string[];
 
+  addSpecialty: (name: string) => void;
   submitProject: (data: SubmitProjectData) => void;
   validateProject: (projectId: string) => void;
   rejectProject: (projectId: string, reason: string) => void;
@@ -71,6 +73,8 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null);
 
 const SESSION_KEY = 'activeUserId';
+const DEFAULT_SPECIALTIES: string[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
+const SPECIALTIES_KEY = 'taskManagerSpecialties';
 
 export function useApp() {
   const ctx = useContext(AppContext);
@@ -84,6 +88,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
+
+  const [specialties, setSpecialties] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_SPECIALTIES;
+    try {
+      const raw = window.localStorage.getItem(SPECIALTIES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return Array.from(new Set([...DEFAULT_SPECIALTIES, ...parsed.map((s) => String(s))]));
+        }
+      }
+    } catch {
+      // storage unavailable
+    }
+    return DEFAULT_SPECIALTIES;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SPECIALTIES_KEY, JSON.stringify(specialties));
+    } catch {
+      // storage unavailable
+    }
+  }, [specialties]);
 
   useEffect(() => {
     try {
@@ -274,7 +302,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             isActive: false,
             workSessions: (st.workSessions ?? []).map((s) =>
               s.end === null
-                ? { ...s, end: endedAt, duration: Math.max(0, Math.round((Date.now() - new Date(s.start).getTime()) / 1000)) }
+                ? { ...s, end: endedAt, duration: Math.max(0, Math.floor((Date.now() - new Date(s.start).getTime()) / 1000)) }
                 : s
             ),
           };
@@ -380,7 +408,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               // Pause: close the running session
               const closed = sessions.map((s) =>
                 s.end === null
-                  ? { ...s, end: now.toISOString(), duration: Math.max(0, Math.round((now.getTime() - new Date(s.start).getTime()) / 1000)) }
+                  ? { ...s, end: now.toISOString(), duration: Math.max(0, Math.floor((now.getTime() - new Date(s.start).getTime()) / 1000)) }
                   : s
               );
               return {
@@ -551,6 +579,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUsers((prev) => [...prev, newUser]);
   }, []);
 
+  const addSpecialty = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSpecialties((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+  }, []);
+
   // Admin-only: update any user's info
   const updateUser: AppState['updateUser'] = useCallback((userId, data) => {
     if (currentUser?.role !== 'admin') return;
@@ -581,7 +615,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AppState>(() => ({
     currentUser, sessionInitialized, login, logout,
-    users, projects, notifications,
+    users, projects, notifications, specialties,
+    addSpecialty,
     submitProject, validateProject, rejectProject, assignManager,
     addProjectMember, removeProjectMember,
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
@@ -592,7 +627,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     scheduleClientMeeting,
     addEmployee, updateUser, updateProfile,
     markNotificationRead, markAllNotificationsRead,
-  }), [currentUser, sessionInitialized, login, logout, users, projects, notifications,
+  }), [currentUser, sessionInitialized, login, logout, users, projects, notifications, specialties,
+       addSpecialty,
        submitProject, validateProject, rejectProject, assignManager,
        addProjectMember, removeProjectMember,
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
