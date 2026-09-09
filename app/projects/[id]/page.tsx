@@ -12,7 +12,7 @@ import {
   CheckCircle2, XCircle, UserCog, Plus, UserPlus,
   FileText, Image as ImageIcon, Edit3, AlertCircle,
   Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo,
-  Phone, Building2, User as UserIcon, CalendarClock,
+  Phone, Mail, Building2, User as UserIcon, CalendarClock, ArrowUpRight,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -36,6 +36,7 @@ import {
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
 import { ProgressBar, ProgressRing } from '@/components/shared/progress';
+import { StatCard } from '@/components/shared/stat-card';
 import {
   getUser, formatDate, formatDateTime, formatCurrency, daysUntil, daysBetween,
   specialtyMeta,
@@ -293,6 +294,14 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Euro} label="Budget" value={formatCurrency(project.budget)} color="text-info" />
+        <StatCard icon={Clock} label="Durée" value={`${durationDays} j · ${durationWeeks} sem.`} color="text-warning" />
+        <StatCard icon={ListTodo} label="Sous-tâches" value={project.subtasks.length} color="text-primary" />
+        <StatCard icon={Users} label="Équipe" value={teamMembers.length} color="text-accent" />
+      </div>
+
       {/* Admin actions */}
       <AnimatePresence>
         {user.role === 'admin' && project.status === 'pending' && (
@@ -458,13 +467,13 @@ export default function ProjectDetailPage() {
               {client && (
                 <div className="mt-5 pt-5 border-t border-border">
                   <h4 className="text-sm font-medium text-muted-foreground mb-3">Client</h4>
-                  <div className="flex items-center gap-3 mb-3">
+                  <button onClick={() => setProfileUser(client)} className="flex items-center gap-3 mb-3 w-full text-left p-1 -m-1 rounded-2xl hover:bg-muted/40 transition-colors group">
                     <UserAvatar user={client} size="md" />
-                    <div>
-                      <p className="font-medium text-sm">{client.name}</p>
-                      <p className="text-xs text-muted-foreground">{client.email}</p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{client.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{client.email}</p>
                     </div>
-                  </div>
+                  </button>
                   <div className="space-y-2">
                     {client.company && (
                       <div className="flex items-center gap-2.5 text-sm">
@@ -647,7 +656,7 @@ export default function ProjectDetailPage() {
                   {project.subtasks.map((st) => {
                     const assignee = getUser(users, st.assignedToId);
                     return (
-                      <Card key={st.id} className="p-4 hover:shadow-md transition-all">
+                      <Card key={st.id} className="p-4 hover:shadow-card-hover hover:border-primary/20 transition-all">
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -711,59 +720,116 @@ export default function ProjectDetailPage() {
         {/* ---- Team tab ---- */}
         <TabsContent value="team">
           <div>
-            {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
-              <div className="mb-4 flex justify-end">
-                <Button onClick={() => setAddMemberOpen(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" /> Ajouter un membre
-                </Button>
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-display text-lg font-bold tracking-tight">Équipe du projet</h3>
+                <span className="inline-flex items-center justify-center h-7 min-w-7 px-2 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                  {teamMembers.length}
+                </span>
               </div>
-            )}
+              {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
+                <Button onClick={() => setAddMemberOpen(true)} className="rounded-full gap-1.5">
+                  <UserPlus className="h-4 w-4" /> Ajouter un membre
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
-                {teamMembers.map((m) => (
-                  <motion.div key={m.userId} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
-                    <Card className="p-5 group cursor-pointer" onClick={() => m.user && setProfileUser(m.user)}>
-                      <div className="flex items-start gap-3">
-                        <UserAvatar user={m.user} size="lg" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">{m.user?.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{m.user?.email}</p>
-                          {m.user?.company && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Building2 className="h-3 w-3" />{m.user.company}
-                            </p>
-                          )}
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <RoleBadge role={m.role} />
-                            {m.user?.memberSpecialty && <span className="text-xs text-muted-foreground">{specialtyMeta[m.user.memberSpecialty]?.label ?? m.user.memberSpecialty}</span>}
+                {teamMembers.map((m) => {
+                  const memberTasks = project.subtasks.filter((st) => st.assignedToId === m.userId);
+                  const total = memberTasks.length;
+                  const doneCount = memberTasks.filter((t) => t.status === 'done').length;
+                  const activeCount = memberTasks.filter((t) => t.status === 'in_progress' || t.status === 'review').length;
+                  const ratio = total ? doneCount / total : 0;
+                  const filled = total ? Math.max(1, Math.round(ratio * 5)) : 0;
+                  const dotColor = ratio >= 0.75 ? 'bg-success' : ratio >= 0.4 ? 'bg-warning' : 'bg-destructive';
+                  const removable = canManage && m.role !== 'client' && m.role !== 'admin' && m.userId !== user.id;
+                  return (
+                    <motion.div key={m.userId} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
+                      <Card
+                        className="group relative cursor-pointer overflow-hidden rounded-[24px] border-border/60 bg-card p-6 shadow-card hover:-translate-y-1 hover:shadow-card-hover hover:border-primary/30 transition-all duration-300"
+                        onClick={() => m.user && setProfileUser(m.user)}
+                      >
+                        <div className="absolute -top-16 -right-16 h-44 w-44 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+                        <div className="flex items-start gap-4">
+                          <UserAvatar user={m.user} className="h-14 w-14 rounded-[18px] shadow-soft-lg flex-shrink-0" />
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="font-display font-semibold text-[15px] leading-tight truncate group-hover:text-primary transition-colors">{m.user?.name}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <RoleBadge role={m.role} />
+                              {m.user?.memberSpecialty && (
+                                <span className="inline-flex items-center rounded-full bg-muted/70 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                  {specialtyMeta[m.user.memberSpecialty]?.label ?? m.user.memberSpecialty}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="relative flex flex-col items-end gap-2 flex-shrink-0">
+                            <span className="flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-white/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 transition-all">
+                              <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                            </span>
+                            {removable && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); removeProjectMember(project.id, m.userId); }}
+                                className="opacity-0 group-hover:opacity-100 h-8 w-8 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        {canManage && m.role !== 'client' && m.role !== 'admin' && m.userId !== user.id && (
-                          <button
-                            onClick={() => removeProjectMember(project.id, m.userId)}
-                            className="opacity-0 group-hover:opacity-100 h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all flex-shrink-0"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-border space-y-1.5">
-                        {m.user?.phone && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Phone className="h-3.5 w-3.5 flex-shrink-0" /> {m.user.phone}
+
+                        <div className="mt-4">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Contacts</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {m.user?.email && (
+                              <a href={`mailto:${m.user.email}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 max-w-[180px] transition-colors">
+                                <Mail className="h-3 w-3 flex-shrink-0" /> <span className="truncate">{m.user.email}</span>
+                              </a>
+                            )}
+                            {m.user?.phone && (
+                              <a href={`tel:${m.user.phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                                <Phone className="h-3 w-3" /> {m.user.phone}
+                              </a>
+                            )}
                           </div>
+                        </div>
+
+                        {m.user?.company && (
+                          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Building2 className="h-3 w-3 flex-shrink-0" /> <span className="truncate">{m.user.company}</span>
+                          </p>
                         )}
-                        {m.user?.address && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <MapPin className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">{m.user.address}</span>
+
+                        <div className="mt-4 pt-4 border-t border-border/60 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Tâches {total > 0 ? `· ${total}` : ''}</span>
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
+                              {[0, 1, 2, 3, 4].map((i) => (
+                                <span
+                                  key={i}
+                                  className={cn('h-2 w-2 rounded-full transition-colors', i < filled ? (total > 0 ? dotColor : 'bg-border') : 'bg-border')}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {total ? `${doneCount}/${total} terminée${doneCount > 1 ? 's' : ''}${activeCount > 0 ? ` · ${activeCount} en cours` : ''}` : 'Aucune tâche'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    </Card>
-                  </motion.div>
-                ))}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
+            {teamMembers.length === 0 && (
+              <Card className="p-10 text-center text-muted-foreground rounded-[24px]">
+                <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p>Aucun membre dans l’équipe pour le moment.</p>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
@@ -1261,7 +1327,7 @@ export default function ProjectDetailPage() {
 function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-muted/50 text-muted-foreground flex-shrink-0">
+      <div className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-muted/50 text-muted-foreground flex-shrink-0">
         <Icon className="h-4 w-4" />
       </div>
       <div>

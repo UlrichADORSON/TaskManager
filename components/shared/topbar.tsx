@@ -79,22 +79,22 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur border-b border-border flex items-center gap-4 px-4 lg:px-6">
-      <button onClick={onMenuClick} className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors">
+    <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center gap-4 px-4 lg:px-6">
+      <button onClick={onMenuClick} className="lg:hidden h-10 w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors">
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Search */}
-      <div className="flex-1 max-w-md" ref={searchRef}>
+      {/* Search — pill large */}
+      <div className="flex-1 max-w-xl" ref={searchRef}>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Rechercher un projet..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
             onFocus={() => setSearchOpen(true)}
-            className="w-full pl-10 pr-4 py-2 text-sm rounded-lg bg-muted/50 border border-transparent focus:border-border focus:bg-card transition-all outline-none placeholder:text-muted-foreground"
+            className="w-full h-10 pl-11 pr-4 text-sm rounded-full bg-muted/70 border border-transparent focus:border-primary/40 focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground"
           />
           <AnimatePresence>
             {searchOpen && searchResults.length > 0 && (
@@ -102,7 +102,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute top-full mt-2 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden"
+                className="absolute top-full mt-2 w-full rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
               >
                 {searchResults.map((p) => (
                   <button
@@ -132,7 +132,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute top-full mt-2 w-full rounded-xl border border-border bg-popover shadow-xl px-4 py-6 text-center text-sm text-muted-foreground"
+                className="absolute top-full mt-2 w-full rounded-2xl border border-border bg-popover shadow-card-hover px-4 py-6 text-center text-sm text-muted-foreground"
               >
                 Aucun projet trouvé pour « {searchQuery} »
               </motion.div>
@@ -147,7 +147,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         {mounted && (
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="p-2.5 rounded-lg hover:bg-muted transition-colors"
+            className="h-10 w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
             title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
           >
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -158,7 +158,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotifOpen(!notifOpen)}
-            className="relative p-2.5 rounded-lg hover:bg-muted transition-colors"
+            className="relative h-10 w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
           >
             <Bell className="h-5 w-5 text-foreground" />
             {unreadCount > 0 && (
@@ -174,7 +174,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="font-semibold text-sm">Notifications</h3>
@@ -217,7 +217,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="flex items-center gap-3 pl-2 sm:pl-3 border-l border-border py-1 rounded-lg hover:bg-muted/50 transition-colors pr-2"
+            className="flex items-center gap-3 pl-2 sm:pl-3 border-l border-border py-1 rounded-full hover:bg-secondary/70 transition-colors pr-2"
           >
             <UserAvatar user={currentUser} size="sm" />
             <div className="hidden sm:block text-left">
@@ -235,7 +235,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
               >
                 <div className="px-4 py-3 border-b border-border">
                   <p className="text-sm font-semibold">{currentUser.name}</p>

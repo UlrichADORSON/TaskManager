@@ -2,13 +2,12 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound } from 'lucide-react';
+import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound, ArrowUpRight, Search } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FilterBar } from '@/components/shared/filter-bar';
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { RoleBadge } from '@/components/shared/badges';
 import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
@@ -21,13 +20,14 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import type { MemberSpecialty, User } from '@/types';
 
 const SPECIALTIES: MemberSpecialty[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
 
 export default function EmployeesPage() {
   const user = useAuthGuard();
-  const { users, addEmployee } = useApp();
+  const { users, projects, addEmployee } = useApp();
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -50,6 +50,24 @@ export default function EmployeesPage() {
     if (search) list = list.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()) || (u.memberSpecialty ?? '').toLowerCase().includes(search.toLowerCase()));
     return list;
   }, [user, users, specialtyFilter, search]);
+
+  const teamStats = useMemo(() => {
+    const team = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
+    const byUser: Record<string, { total: number; done: number; active: number }> = {};
+    projects.forEach((p) => {
+      p.subtasks.forEach((st) => {
+        if (!st.assignedToId) return;
+        const rec = byUser[st.assignedToId] ?? { total: 0, done: 0, active: 0 };
+        rec.total += 1;
+        if (st.status === 'done') rec.done += 1;
+        if (st.status === 'in_progress' || st.status === 'review') rec.active += 1;
+        byUser[st.assignedToId] = rec;
+      });
+    });
+    const activePersons = team.filter((u) => (byUser[u.id]?.active ?? 0) > 0).length;
+    const activeTasks = team.reduce((acc, u) => acc + (byUser[u.id]?.active ?? 0), 0);
+    return { byUser, activePersons, activeTasks, teamCount: team.length };
+  }, [users, projects]);
 
   if (!user) return null;
 
@@ -76,87 +94,203 @@ export default function EmployeesPage() {
     setPhotoPreview(undefined);
   };
 
+  const stats = [
+    { badge: 'Équipe', badgeCls: 'bg-primary/10 text-primary', value: teamStats.teamCount, label: 'membres & chefs de projet' },
+    { badge: 'En activité', badgeCls: 'bg-success/10 text-success', value: teamStats.activePersons, label: 'personnes en charge de tâches en cours' },
+    { badge: 'En cours', badgeCls: 'bg-warning/10 text-warning', value: teamStats.activeTasks, label: 'tâches en cours ou en révision' },
+  ];
+
   return (
     <AppShell>
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-4 mb-8">
         <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">Équipe</h2>
-          <p className="text-sm text-muted-foreground mt-1">{visibleUsers.length} membre{visibleUsers.length > 1 ? 's' : ''} dans l’équipe</p>
+          <h2 className="font-display text-4xl font-bold tracking-tight leading-none">Équipe<span className="text-primary"> ·</span></h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            {visibleUsers.length} membre{visibleUsers.length > 1 ? 's' : ''} affiché{visibleUsers.length > 1 ? 's' : ''}
+          </p>
         </div>
         {canManage && (
-          <Button onClick={() => setAddOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" /> Ajouter un membre
+          <Button onClick={() => setAddOpen(true)} className="rounded-full gap-1.5 shadow-[0_8px_20px_rgba(46,152,255,0.35)]">
+            <UserPlus className="h-4 w-4" /> Ajouter un membre
           </Button>
         )}
       </div>
 
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Rechercher une personne..."
-        filters={[
-          {
-            key: 'specialty', value: specialtyFilter, onChange: setSpecialtyFilter,
-            options: [
-              { value: 'all', label: 'Toutes les spécialités' },
-              ...SPECIALTIES.map((s) => ({ value: s, label: specialtyMeta[s]?.label ?? s })),
-            ],
-          },
-        ]}
-      />
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {stats.map((s) => (
+          <div key={s.badge} className="relative overflow-hidden rounded-[24px] bg-card border border-border/60 shadow-card p-6">
+            <div className="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-primary/5 blur-2xl pointer-events-none" />
+            <span className={cn('relative inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest', s.badgeCls)}>
+              {s.badge}
+            </span>
+            <p className="relative mt-4 font-display text-5xl font-bold tracking-tight leading-none">{s.value}</p>
+            <p className="relative mt-2.5 text-sm text-muted-foreground">{s.label}</p>
+          </div>
+        ))}
+      </div>
 
+      {/* Filtres en capsules */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-8">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher une personne…"
+            className="w-full pl-11 pr-9 py-2.5 rounded-full bg-card border border-border/60 text-sm shadow-card outline-none placeholder:text-muted-foreground focus:border-primary/40 transition-colors"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {['all', ...SPECIALTIES].map((s) => {
+            const active = specialtyFilter === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setSpecialtyFilter(s)}
+                className={cn(
+                  'rounded-full px-4 py-2 text-xs font-semibold transition-all',
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(46,152,255,0.35)]'
+                    : 'bg-card border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40'
+                )}
+              >
+                {s === 'all' ? 'Toutes' : (specialtyMeta[s]?.label ?? s)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section membres */}
       {visibleUsers.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
+        <div className="text-center py-16 rounded-[24px] bg-card border border-border/60 shadow-card text-muted-foreground">
           <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>Aucune personne trouvée.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          <AnimatePresence mode="popLayout">
-            {visibleUsers.map((u, i) => (
-              <motion.div
-                key={u.id}
-                layout
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3) }}
-              >
-                <Card className="p-5 hover:shadow-lg hover:border-primary/20 transition-all group cursor-pointer" onClick={() => setSelectedUser(u)}>
-                  <div className="flex items-start gap-3">
-                    <UserAvatar user={u} size="lg" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{u.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {u.memberSpecialty ? (specialtyMeta[u.memberSpecialty]?.label ?? u.memberSpecialty) : u.email}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <RoleBadge role={u.role} />
-                        {u.memberSpecialty && <span className="text-xs text-muted-foreground">{specialtyMeta[u.memberSpecialty]?.label}</span>}
-                      </div>
-                    </div>
-                  </div>
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <h3 className="font-display text-lg font-bold tracking-tight">Membres de l’équipe</h3>
+              <span className="inline-flex items-center justify-center h-7 min-w-7 px-2 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                {visibleUsers.length}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground hidden sm:block">Cliquer sur une carte pour ouvrir le profil</span>
+          </div>
 
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5" /> <span className="truncate">{u.email}</span>
-                    </div>
-                    {u.phone && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5" /> {u.phone}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence mode="popLayout">
+              {visibleUsers.map((u, i) => {
+                const stats = teamStats.byUser[u.id];
+                const total = stats?.total ?? 0;
+                const done = stats?.done ?? 0;
+                const active = stats?.active ?? 0;
+                const ratio = total ? done / total : 0;
+                const filled = total ? Math.max(1, Math.round(ratio * 5)) : 0;
+                const dotColor = ratio >= 0.75 ? 'bg-success' : ratio >= 0.4 ? 'bg-warning' : 'bg-destructive';
+                return (
+                  <motion.div
+                    key={u.id}
+                    layout
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3) }}
+                  >
+                    <Card
+                      className="group relative cursor-pointer overflow-hidden rounded-[24px] border-border/60 bg-card p-6 shadow-card hover:-translate-y-1 hover:shadow-card-hover hover:border-primary/30 transition-all duration-300"
+                      onClick={() => setSelectedUser(u)}
+                    >
+                      <div className="absolute -top-16 -right-16 h-44 w-44 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+                      <div className="flex items-start gap-4">
+                        <UserAvatar user={u} className="h-16 w-16 rounded-[20px] shadow-soft-lg flex-shrink-0" />
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="font-display font-semibold text-[15px] leading-tight truncate group-hover:text-primary transition-colors">{u.name}</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <RoleBadge role={u.role} />
+                            {(u.role === 'membre' || u.role === 'chef_de_projet') && u.memberSpecialty && (
+                              <span className="inline-flex items-center rounded-full bg-muted/70 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                {specialtyMeta[u.memberSpecialty]?.label ?? u.memberSpecialty}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="relative flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-white/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 flex-shrink-0 transition-all">
+                          <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        </span>
                       </div>
-                    )}
-                    {u.address && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5" /> <span className="truncate">{u.address}</span>
+
+                      <div className="mt-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Contacts</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={`mailto:${u.email}`}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 max-w-[200px] transition-colors"
+                          >
+                            <Mail className="h-3 w-3 flex-shrink-0" /> <span className="truncate">{u.email}</span>
+                          </a>
+                          {u.phone && (
+                            <a
+                              href={`tel:${u.phone.replace(/\s/g, '')}`}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                            >
+                              <Phone className="h-3 w-3" /> {u.phone}
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+
+                      {(u.company || u.address) && (
+                        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {u.company && (
+                            <>
+                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{u.company}</span>
+                            </>
+                          )}
+                          {u.company && u.address && <span className="text-muted-foreground/50">·</span>}
+                          {u.address && (
+                            <>
+                              <MapPin className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{u.address}</span>
+                            </>
+                          )}
+                        </p>
+                      )}
+
+                      <div className="mt-4 pt-4 border-t border-border/60 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Activité</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                              <span
+                                key={i}
+                                className={cn('h-2 w-2 rounded-full transition-colors', i < filled ? (total > 0 ? dotColor : 'bg-border') : 'bg-border')}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {total ? `${done}/${total} terminée${done > 1 ? 's' : ''}${active > 0 ? ` · ${active} en cours` : ''}` : 'Aucune tâche'}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </>
       )}
 
       {/* Add member dialog */}

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, FolderKanban, Users, CheckSquare,
-  FileText, Settings, LogOut, ChevronLeft, Layers, Bell,
+  FileText, Settings, LogOut, ChevronLeft, Layers, Bell, ChevronRight,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { cn } from '@/lib/utils';
@@ -42,11 +42,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       initial={false}
       animate={{ width: collapsed ? 72 : 264 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="fixed left-0 top-0 z-40 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border"
+      className="fixed left-0 top-0 z-40 h-screen bg-sidebar text-sidebar-foreground flex flex-col [background-image:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0)_35%)] overflow-hidden"
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-border flex-shrink-0">
-        <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 h-16 flex-shrink-0">
+        <div className="flex items-center justify-center h-10 w-10 rounded-2xl bg-white/10 text-white border border-white/10 flex-shrink-0 shadow-inner">
           <Layers className="h-5 w-5" />
         </div>
         <AnimatePresence>
@@ -57,26 +57,31 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               exit={{ opacity: 0, x: -10 }}
               className="flex-1 overflow-hidden"
             >
-              <h1 className="font-display text-lg font-bold tracking-tight">ProFlow</h1>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gestion de projets</p>
+              <h1 className="font-display text-lg font-bold tracking-tight text-white">ProFlow</h1>
+              <p className="text-[10px] text-white/50 uppercase tracking-wider">Gestion de projets</p>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3 space-y-1.5">
         {items.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
           const showBadge = item.href === '/notifications' && unreadCount > 0;
           return (
             <Link key={item.href} href={item.href} className={cn(
-              'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all relative',
+              'group flex items-center gap-3 rounded-2xl px-2 py-2 transition-all',
               isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                ? 'bg-primary text-white shadow-lg shadow-primary/40'
+                : 'text-white/70 hover:text-white hover:bg-white/10',
             )}>
-              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <span className={cn(
+                'flex items-center justify-center h-10 w-10 rounded-xl flex-shrink-0 transition-colors',
+                isActive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/80 group-hover:bg-white/15 group-hover:text-white',
+              )}>
+                <item.icon className="h-[18px] w-[18px]" />
+              </span>
               <AnimatePresence>
                 {!collapsed && (
                   <motion.span
@@ -89,13 +94,16 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                   </motion.span>
                 )}
               </AnimatePresence>
+              {!collapsed && !showBadge && (
+                <ChevronRight className={cn('h-4 w-4 flex-shrink-0 transition-all', isActive ? 'text-white rotate-90' : 'text-white/35 group-hover:text-white/70')} />
+              )}
               {showBadge && !collapsed && (
-                <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center">
+                <span className="bg-destructive text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center">
                   {unreadCount}
                 </span>
               )}
               {showBadge && collapsed && (
-                <span className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+                <span className="absolute top-1.5 right-1.5 bg-destructive text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
                   {unreadCount}
                 </span>
               )}
@@ -103,28 +111,40 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           );
         })}
         <Link href="/settings" className={cn(
-          'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-          pathname === '/settings' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          'group flex items-center gap-3 rounded-2xl px-2 py-2 transition-all',
+          pathname === '/settings' ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'text-white/70 hover:text-white hover:bg-white/10',
         )}>
-          <Settings className="h-5 w-5 flex-shrink-0" />
+          <span className={cn(
+            'flex items-center justify-center h-10 w-10 rounded-xl flex-shrink-0 transition-colors',
+            pathname === '/settings' ? 'bg-white/15 text-white' : 'bg-white/10 text-white/80 group-hover:bg-white/15 group-hover:text-white',
+          )}>
+            <Settings className="h-[18px] w-[18px]" />
+          </span>
           {!collapsed && <span className="flex-1 truncate">Paramètres</span>}
+          {!collapsed && (
+            <ChevronRight className={cn('h-4 w-4 flex-shrink-0 transition-all', pathname === '/settings' ? 'text-white rotate-90' : 'text-white/35 group-hover:text-white/70')} />
+          )}
         </Link>
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-border p-3 space-y-1 flex-shrink-0">
+      <div className="border-t border-white/10 p-3 space-y-1 flex-shrink-0">
         <button
           onClick={onToggle}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="w-full flex items-center gap-3 rounded-2xl px-2 py-2 text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
         >
-          <ChevronLeft className={cn('h-5 w-5 flex-shrink-0 transition-transform', collapsed && 'rotate-180')} />
+          <span className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white/80 flex-shrink-0">
+            <ChevronLeft className={cn('h-[18px] w-[18px] transition-transform', collapsed && 'rotate-180')} />
+          </span>
           {!collapsed && <span>Réduire</span>}
         </button>
         <button
           onClick={() => { logout(); router.push('/login'); }}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+          className="w-full flex items-center gap-3 rounded-2xl px-2 py-2 text-sm text-white/70 hover:text-destructive hover:bg-destructive/20 transition-colors"
         >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
+          <span className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white/80 flex-shrink-0">
+            <LogOut className="h-[18px] w-[18px]" />
+          </span>
           {!collapsed && <span>Déconnexion</span>}
         </button>
       </div>

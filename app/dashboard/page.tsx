@@ -300,10 +300,10 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.4 }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
         >
           {/* Activité mensuelle */}
-          <Card className="p-5 lg:col-span-2">
+          <Card className="p-5">
             <div className="flex items-baseline justify-between gap-4 mb-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" /> Activité mensuelle
@@ -434,7 +434,7 @@ export default function DashboardPage() {
           <p>Aucun projet trouvé.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-4">
           {visibleProjects.map((p, i) => (
             <ProjectCard key={p.id} project={p} index={i} />
           ))}

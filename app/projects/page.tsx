@@ -34,7 +34,17 @@ export default function ProjectsPage() {
   return (
     <AppShell>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h2 className="font-display text-2xl font-bold tracking-tight mb-6">Projets</h2>
+        <div className="flex items-end justify-between gap-4 mb-6">
+          <div>
+            <h2 className="font-display text-2xl font-bold tracking-tight">Projets</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {visibleProjects.length} projet{visibleProjects.length > 1 ? 's' : ''} visible{visibleProjects.length > 1 ? 's' : ''}
+            </p>
+          </div>
+          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium bg-card border border-border shadow-card">
+            <FolderKanban className="h-3.5 w-3.5 text-primary" /> {projects.length} au total
+          </span>
+        </div>
       </motion.div>
 
       <FilterBar
@@ -68,7 +78,7 @@ export default function ProjectsPage() {
           <p>Aucun projet trouvé.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-4">
           {visibleProjects.map((p, i) => (
             <ProjectCard key={p.id} project={p} index={i} />
           ))}

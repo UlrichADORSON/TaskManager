@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/shared/date-picker';
+import { ProgressBar } from '@/components/shared/progress';
 import { cn } from '@/lib/utils';
 import type { Priority, Attachment } from '@/types';
 
@@ -151,15 +152,30 @@ export default function SubmitProjectPage() {
     return <FileText className="h-4 w-4" />;
   };
 
+  const completion = Math.min(100, Math.round((
+    [
+      form.title, form.description, form.startDate, form.endDate, form.budget, form.category,
+      form.platformUsers, form.desiredFeatures, form.necessaryPages, form.plannedFeatures,
+    ].filter(Boolean).length / 10
+  ) * 100));
+
+  const postSteps = [
+    { title: 'Examen par l’administrateur', desc: 'Votre projet est analysé, puis validé ou rejeté avec un motif.' },
+    { title: 'Notification de la décision', desc: 'Vous êtes averti dès que l’examen est terminé.' },
+    { title: 'Assignation d’un chef de projet', desc: 'Un chef pilote ensuite la réalisation du projet.' },
+    { title: 'Suivi de l’avancement', desc: 'Consultez le planning, les tâches et les rapports en temps réel.' },
+  ];
+
   return (
     <AppShell>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Soumettre un nouveau projet</h2>
           <p className="text-muted-foreground mb-6">Décrivez votre projet en détail. Un administrateur l’examinera avant validation.</p>
         </motion.div>
 
-        <Card className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <Card className="p-6 lg:col-span-2">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Logo section */}
             <div>
@@ -350,6 +366,43 @@ export default function SubmitProjectPage() {
             </div>
           </form>
         </Card>
+
+        <div className="space-y-4 lg:sticky lg:top-6">
+          <Card className="p-5">
+            <h3 className="font-semibold mb-4">Après la soumission</h3>
+            <ol className="space-y-4">
+              {postSteps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{step.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold mb-3">Complétude du formulaire</h3>
+            <div className="flex items-center justify-between mb-1.5 text-xs">
+              <span className="text-muted-foreground">Champs renseignés</span>
+              <span className="font-bold">{completion}%</span>
+            </div>
+            <ProgressBar
+              value={completion}
+              indicatorClassName={completion < 50 ? 'bg-warning' : completion < 90 ? 'bg-info' : 'bg-success'}
+            />
+            {completion === 100 && (
+              <p className="text-xs text-success font-medium mt-3 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Tout est prêt, vous pouvez soumettre !
+              </p>
+            )}
+          </Card>
+        </div>
+        </div>
       </div>
     </AppShell>
   );

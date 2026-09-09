@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Mail, Phone, Building2, MapPin, Briefcase, Check, X, Pencil, KeyRound, FolderKanban,
+  Mail, Phone, Building2, MapPin, Pencil, Check, X, KeyRound, FolderKanban, ListTodo,
 } from 'lucide-react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,13 +15,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { UserAvatar } from '@/components/shared/user-avatar';
-import { RoleBadge } from '@/components/shared/badges';
-import { specialtyMeta } from '@/lib/status';
+import { specialtyMeta, formatCurrency, projectStatusMeta, subtaskStatusMeta } from '@/lib/status';
 import { useApp } from '@/lib/app-context';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import type { User, Role, MemberSpecialty } from '@/types';
 
 const SPECIALTIES: MemberSpecialty[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
+
+const roleLabel: Record<Role, string> = {
+  admin: 'Admin',
+  chef_de_projet: 'Chef de projet',
+  membre: 'Membre',
+  client: 'Client',
+};
 
 interface MemberProfileDialogProps {
   user: User | null;
@@ -64,7 +71,37 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
       : p.members.some((m) => m.userId === fresh.id) || p.managerId === fresh.id
   ) : []);
 
-  const editable = canEdit && !!view && (view.role === 'membre' || view.role === 'chef_de_projet');
+  const assignedTasks = fresh && fresh.role !== 'client'
+    ? memberProjects.flatMap((p) => p.subtasks.filter((st) => st.assignedToId === fresh.id).map((task) => ({ task, project: p })))
+    : [];
+
+  const doneTasks = assignedTasks.filter((r) => r.task.status === 'done').length;
+  const activeTasks = assignedTasks.filter((r) => r.task.status === 'in_progress' || r.task.status === 'review').length;
+  const avgProgress = assignedTasks.length
+    ? Math.round(assignedTasks.reduce((acc, r) => acc + r.task.progress, 0) / assignedTasks.length)
+    : 0;
+
+  const clientProjects = fresh && fresh.role === 'client' ? memberProjects : [];
+  const totalBudget = clientProjects.reduce((acc, p) => acc + p.budget, 0);
+  const pendingMods = clientProjects.reduce((acc, p) => acc + p.modifications.filter((m) => m.status === 'pending').length, 0);
+  const clientAvgProgress = clientProjects.length
+    ? Math.round(clientProjects.reduce((acc, p) => acc + p.progress, 0) / clientProjects.length)
+    : 0;
+
+  const isClient = fresh?.role === 'client';
+  const stats = fresh ? (isClient ? [
+    { label: 'Projets', value: clientProjects.length },
+    { label: 'Budget', value: formatCurrency(totalBudget) },
+    { label: 'Progression', value: `${clientAvgProgress}%` },
+    { label: 'Modifs en attente', value: pendingMods },
+  ] : [
+    { label: 'Projets', value: memberProjects.length },
+    { label: 'Tâches assignées', value: assignedTasks.length },
+    { label: 'Terminées', value: doneTasks },
+    { label: 'En cours', value: activeTasks },
+  ]) : [];
+
+  const editable = canEdit && !!view && (view.role === 'membre' || view.role === 'chef_de_projet' || isClient);
 
   const handleSave = () => {
     if (!user) return;
@@ -84,180 +121,235 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
       password: form.password.trim() || undefined,
     });
     setEditing(false);
-    toast({ title: 'Profil mis à jour', description: 'Les informations du membre ont été enregistrées.' });
+    toast({ title: 'Profil mis à jour', description: 'Les informations du profil ont été enregistrées.' });
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onOpenChange(false); setEditing(false); } }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserAvatar user={view} size="sm" /> Profil du membre
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-xl sm:rounded-[28px] border-0 p-0 gap-0 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+        <DialogTitle className="sr-only">Profil de {view?.name}</DialogTitle>
 
         {!view ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Membre introuvable.</p>
+          <p className="text-sm text-muted-foreground py-12 text-center">Profil introuvable.</p>
         ) : (
-          <div className="space-y-4 py-2">
-            {/* Identity header */}
-            <div className="flex items-center gap-4">
-              <UserAvatar user={view} size="xl" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-lg truncate">{view.name}</p>
-                <div className="flex flex-wrap gap-2 mt-1.5">
-                  <RoleBadge role={view.role} />
-                  {view.memberSpecialty && (
-                    <span className="text-xs text-muted-foreground">{specialtyMeta[view.memberSpecialty]?.label ?? view.memberSpecialty}</span>
+          <div className="relative max-h-[85vh] overflow-y-auto scrollbar-thin">
+            {/* Halo lumineux */}
+            <div className="absolute -top-20 -right-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+
+            {/* Identité */}
+            <div className="relative p-8 pb-4">
+              <div className="flex items-start gap-5">
+                <UserAvatar
+                  user={view}
+                  size="xl"
+                  className="h-24 w-24 rounded-[28px] shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
+                />
+                <div className="min-w-0 flex-1 pt-1">
+                  <p className="font-display text-2xl font-bold tracking-tight leading-tight truncate">{view.name}</p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-semibold">
+                      {roleLabel[view.role]}
+                    </span>
+                    {view.memberSpecialty && (
+                      <span className="inline-flex items-center rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                        {specialtyMeta[view.memberSpecialty]?.label ?? view.memberSpecialty}
+                      </span>
+                    )}
+                  </div>
+                  {editable && !editing && (
+                    <Button size="sm" className="h-8 rounded-full px-4 mt-4" onClick={() => setEditing(true)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" /> Modifier
+                    </Button>
                   )}
                 </div>
               </div>
-              {editable && !editing && (
-                <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Modifier
-                </Button>
+
+              {view.bio && (
+                <p className="mt-6 text-sm text-muted-foreground leading-relaxed max-w-md">{view.bio}</p>
               )}
-              {editable && editing && (
-                <p className="text-xs text-muted-foreground">Mode édition</p>
-              )}
+
+              {/* Coordonnées en capsules */}
+              <div className="mt-6 flex flex-wrap gap-2">
+                {view.email && (
+                  <a href={`mailto:${view.email}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3.5 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                    <Mail className="h-3.5 w-3.5" /> <span className="truncate max-w-[220px]">{view.email}</span>
+                  </a>
+                )}
+                {view.phone && (
+                  <a href={`tel:${view.phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3.5 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                    <Phone className="h-3.5 w-3.5" /> {view.phone}
+                  </a>
+                )}
+                {view.company && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3.5 py-1.5 text-xs text-muted-foreground">
+                    <Building2 className="h-3.5 w-3.5" /> {view.company}
+                  </span>
+                )}
+                {view.address && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3.5 py-1.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" /> {view.address}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {!editing ? (
-              <>
-                {/* Contact info */}
-                <div className="space-y-2">
-                  {view.memberSpecialty && (
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <Briefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span>{specialtyMeta[view.memberSpecialty]?.label ?? view.memberSpecialty}</span>
+            {/* Statistiques minimales */}
+            {stats.length > 0 && (
+              <div className="relative px-8 py-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {stats.map((s) => (
+                    <div key={s.label} className="rounded-[20px] bg-[#F7F7F6] py-4 px-2 text-center min-w-0">
+                      <p className="font-display text-xl font-bold truncate">{s.value}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{s.label}</p>
                     </div>
-                  )}
-                  {view.email && (
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <a href={`mailto:${view.email}`} className="truncate hover:text-primary hover:underline">{view.email}</a>
-                    </div>
-                  )}
-                  {view.phone && (
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <a href={`tel:${view.phone.replace(/\s/g, '')}`}>{view.phone}</a>
-                    </div>
-                  )}
-                  {view.company && (
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span>{view.company}</span>
-                    </div>
-                  )}
-                  {view.address && (
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span>{view.address}</span>
-                    </div>
-                  )}
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Carte sombre d'activité */}
+            <div className="relative px-8 pb-8 pt-2">
+              <div className="rounded-[28px] bg-[#2D2D2D] text-white p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-display font-semibold text-[15px]">
+                    {isClient ? 'Vos projets' : 'Tâches récentes'}
+                  </h4>
+                  <span className="inline-flex items-center rounded-full bg-[#2E98FF] px-3 py-1 text-[11px] font-semibold text-white">
+                    {isClient ? `${clientAvgProgress}%` : `${avgProgress}%`}
+                  </span>
                 </div>
 
-                {view.bio && (
-                  <p className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/40">{view.bio}</p>
-                )}
-
-                {memberProjects.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <FolderKanban className="h-3.5 w-3.5" /> Projets ({memberProjects.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {memberProjects.slice(0, 5).map((p) => (
-                        <div key={p.id} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-muted/30">
-                          <span className="truncate">{p.title}</span>
+                {isClient ? (
+                  clientProjects.length === 0 ? (
+                    <p className="text-white/50 text-sm py-6 text-center">Aucun projet pour l’instant.</p>
+                  ) : clientProjects.slice(0, 4).map((p) => (
+                    <div key={p.id} className="flex items-center gap-3 py-3 border-b border-white/[0.08] last:border-0">
+                      <span className="flex items-center justify-center h-9 w-9 rounded-full bg-white/10 text-white/60 flex-shrink-0">
+                        <FolderKanban className="h-4 w-4" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.title}</p>
+                        <p className="text-[11px] text-white/50 mt-0.5 truncate">
+                          {projectStatusMeta[p.status]?.label} · {formatCurrency(p.budget)}
+                        </p>
+                      </div>
+                      <div className="w-24 flex-shrink-0">
+                        <div className="h-1.5 rounded-full bg-white/10">
+                          <div className="h-full rounded-full bg-[#2E98FF]" style={{ width: `${p.progress}%` }} />
                         </div>
-                      ))}
-                      {memberProjects.length > 5 && (
-                        <p className="text-xs text-muted-foreground">+ {memberProjects.length - 5} autres projets</p>
+                      </div>
+                    </div>
+                  ))
+                ) : assignedTasks.length === 0 ? (
+                  <p className="text-white/50 text-sm py-6 text-center">Aucune tâche assignée pour l’instant.</p>
+                ) : assignedTasks.slice(0, 4).map((r) => {
+                  const done = r.task.status === 'done';
+                  return (
+                    <div key={r.task.id} className="flex items-center gap-3 py-3 border-b border-white/[0.08] last:border-0">
+                      <span className={cn('flex items-center justify-center h-9 w-9 rounded-full flex-shrink-0', done ? 'bg-[#2E98FF] text-white' : 'bg-white/10 text-white/50')}>
+                        {done ? <Check className="h-4 w-4" /> : <ListTodo className="h-4 w-4" />}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{r.task.title}</p>
+                        <p className="text-[11px] text-white/50 mt-0.5 truncate">
+                          {subtaskStatusMeta[r.task.status]?.label} · {r.project.title}
+                        </p>
+                      </div>
+                      {!done && (
+                        <div className="w-24 flex-shrink-0">
+                          <div className="h-1.5 rounded-full bg-white/10">
+                            <div className="h-full rounded-full bg-[#2E98FF]" style={{ width: `${r.task.progress}%` }} />
+                          </div>
+                        </div>
                       )}
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mode édition */}
+            {editing && (
+              <div className="relative px-8 pb-8">
+                <div className="rounded-[24px] bg-[#F7F7F6] p-5 space-y-4">
+                  <div className="flex items-start gap-2 -mt-1">
+                    <KeyRound className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground">
+                      Vous pouvez modifier les informations de ce profil. Laissez le mot de passe vide pour ne pas le changer.
+                    </p>
                   </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20">
-                    <KeyRound className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-muted-foreground">Vous pouvez modifier les informations de ce membre. Laissez le mot de passe vide pour ne pas le changer.</p>
-                  </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto scrollbar-thin pr-1">
-                  <div>
-                    <Label>Nom complet *</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Email *</Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Rôle</Label>
-                    <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="membre">Membre</SelectItem>
-                        <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {form.role === 'membre' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <Label>Spécialité</Label>
-                      <Select value={form.memberSpecialty || undefined} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
-                        <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
-                        <SelectContent>
-                          {SPECIALTIES.map((s) => (
-                            <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Nom complet *</Label>
+                      <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                     </div>
-                  )}
-                  <div>
-                    <Label>Téléphone</Label>
-                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 06 12 34 56 78" />
-                  </div>
-                  <div>
-                    <Label>Entreprise</Label>
-                    <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Ex: TechStart SAS" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Adresse</Label>
-                    <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue de la Paix, 75002 Paris" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Mot de passe (laissez vide pour ne pas changer)</Label>
-                    <Input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Nouveau mot de passe" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Bio</Label>
-                    <Textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} />
+                    <div>
+                      <Label>Email *</Label>
+                      <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    </div>
+                    {!isClient && (
+                      <>
+                        <div>
+                          <Label>Rôle</Label>
+                          <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="membre">Membre</SelectItem>
+                              <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {form.role === 'membre' && (
+                          <div>
+                            <Label>Spécialité</Label>
+                            <Select value={form.memberSpecialty || undefined} onValueChange={(v) => setForm({ ...form, memberSpecialty: v as MemberSpecialty })}>
+                              <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                              <SelectContent>
+                                {SPECIALTIES.map((s) => (
+                                  <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <div>
+                      <Label>Téléphone</Label>
+                      <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 06 12 34 56 78" />
+                    </div>
+                    <div>
+                      <Label>{isClient ? 'Entreprise' : 'Entreprise'}</Label>
+                      <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Ex: TechStart SAS" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label>Adresse</Label>
+                      <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue de la Paix, 75002 Paris" />
+                    </div>
+                    {!isClient && (
+                      <div className="sm:col-span-2">
+                        <Label>Mot de passe (laissez vide pour ne pas changer)</Label>
+                        <Input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Nouveau mot de passe" />
+                      </div>
+                    )}
+                    <div className="sm:col-span-2">
+                      <Label>Bio</Label>
+                      <Textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} />
+                    </div>
                   </div>
                 </div>
-              </>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setEditing(false)}>
+                    <X className="h-3.5 w-3.5 mr-1.5" /> Annuler
+                  </Button>
+                  <Button size="sm" className="rounded-full" onClick={handleSave}>
+                    <Check className="h-3.5 w-3.5 mr-1.5" /> Enregistrer
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}
-
-        <DialogFooter>
-          {editing ? (
-            <>
-              <Button variant="outline" onClick={() => setEditing(false)} className="gap-1.5">
-                <X className="h-3.5 w-3.5" /> Annuler
-              </Button>
-              <Button onClick={handleSave} className="gap-1.5 bg-success hover:bg-success/90">
-                <Check className="h-3.5 w-3.5" /> Enregistrer
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
-          )}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

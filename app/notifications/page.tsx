@@ -2,7 +2,11 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Bell, CheckCheck } from 'lucide-react';
+import {
+  Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
+  AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
@@ -12,19 +16,19 @@ import { timeAgo } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import type { AppNotification } from '@/types';
 
-const notificationIcon: Record<AppNotification['type'], string> = {
-  project_submitted: '📂',
-  project_validated: '✅',
-  project_rejected: '❌',
-  subtask_assigned: '📌',
-  delay_detected: '⏰',
-  project_completed: '🎉',
-  modification_requested: '📝',
-  modification_reviewed: '🔍',
-  member_added: '👥',
-  subtask_reviewed: '✅',
-  member_created: '👤',
-  calendar_event: '📅',
+const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; color: string }> = {
+  project_submitted: { icon: FolderKanban, color: 'text-warning bg-warning/10' },
+  project_validated: { icon: CheckCircle2, color: 'text-info bg-info/10' },
+  project_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
+  subtask_assigned: { icon: CheckSquare, color: 'text-primary bg-primary/10' },
+  delay_detected: { icon: AlarmClock, color: 'text-destructive bg-destructive/10' },
+  project_completed: { icon: PartyPopper, color: 'text-success bg-success/10' },
+  modification_requested: { icon: Pencil, color: 'text-warning bg-warning/10' },
+  modification_reviewed: { icon: SearchCheck, color: 'text-info bg-info/10' },
+  member_added: { icon: UserPlus, color: 'text-success bg-success/10' },
+  subtask_reviewed: { icon: BadgeCheck, color: 'text-success bg-success/10' },
+  member_created: { icon: User, color: 'text-primary bg-primary/10' },
+  calendar_event: { icon: CalendarPlus, color: 'text-accent bg-accent/10' },
 };
 
 export default function NotificationsPage() {
@@ -45,8 +49,8 @@ export default function NotificationsPage() {
           <p className="text-sm text-muted-foreground mt-1">{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</p>
         </div>
         {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllNotificationsRead}>
-            <CheckCheck className="h-4 w-4 mr-2" /> Tout marquer comme lu
+          <Button variant="outline" size="sm" onClick={markAllNotificationsRead} className="gap-1.5">
+            <CheckCheck className="h-4 w-4" /> Tout marquer comme lu
           </Button>
         )}
       </div>
@@ -67,7 +71,7 @@ export default function NotificationsPage() {
             >
               <Card
                 className={cn(
-                  'p-4 flex items-start gap-3 cursor-pointer hover:shadow-md transition-shadow',
+                  'p-4 flex items-start gap-3 cursor-pointer hover:-translate-y-0.5 hover:shadow-card-hover transition-all duration-300',
                   !n.read && 'border-primary/30 bg-primary/5',
                 )}
                 onClick={() => {
@@ -75,7 +79,9 @@ export default function NotificationsPage() {
                   if (n.projectId) router.push(`/projects/${n.projectId}`);
                 }}
               >
-                <span className="text-xl flex-shrink-0 mt-0.5">{notificationIcon[n.type]}</span>
+                <span className={cn('flex items-center justify-center h-10 w-10 rounded-xl flex-shrink-0', notificationMeta[n.type].color)}>
+                  {(() => { const Icon = notificationMeta[n.type].icon; return <Icon className="h-5 w-5" />; })()}
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{n.title}</p>
                   <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
