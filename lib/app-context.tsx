@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import type {
   User, Project, AppNotification, Subtask, SubtaskStatus,
   ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
-  ModificationTarget, Role, CalendarEvent, MemberSpecialty,
+  ModificationTarget, Role, MemberSpecialty,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -58,6 +58,8 @@ interface AppState {
   suggestModification: (data: SuggestModificationData) => void;
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
   addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
+  addSubtaskAttachment: (projectId: string, subtaskId: string, attachment: Attachment) => void;
+  updateSubtaskProgress: (projectId: string, subtaskId: string, progress: number) => void;
   scheduleClientMeeting: (projectId: string, data: { date: string; note: string }) => void;
   addEmployee: (data: { name: string; email: string; password: string; phone: string; role: 'chef_de_projet' | 'membre'; memberSpecialty?: MemberSpecialty; avatarUrl?: string; company?: string; address?: string; bio?: string }) => void;
   updateUser: (userId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; role?: Role; memberSpecialty?: MemberSpecialty; password?: string; avatarUrl?: string }) => void;
@@ -292,12 +294,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
     const proj = projects.find((p) => p.id === projectId);
     const st = proj?.subtasks.find((s) => s.id === subtaskId);
-    if (proj && st) {
+    if (proj && st && status === 'review') {
       const notifyIds = [proj.managerId, 'u-admin-1'].filter((id): id is string => !!id && id !== currentUser?.id);
-      const msgType = status === 'review' ? 'subtask_reviewed' : 'project_completed';
       notifyIds.forEach((uid) => {
         setNotifications((prev) => [
-          { id: `n-${Date.now()}-${uid}`, userId: uid, type: msgType, title: status === 'review' ? 'Sous-tâche à valider' : 'Tâche mise à jour', message: status === 'review' ? `« ${st.title} » est terminée et attend votre validation.` : `La tâche « ${st.title} » est maintenant « ${status} ».`, projectId, read: false, createdAt: new Date().toISOString() },
+          { id: `n-${Date.now()}-${uid}`, userId: uid, type: 'subtask_reviewed', title: 'Sous-tâche à valider', message: `« ${st.title} » est terminée et attend votre validation.`, projectId, read: false, createdAt: new Date().toISOString() },
           ...prev,
         ]);
       });
@@ -486,6 +487,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ));
   }, [currentUser]);
 
+  // ---- Task attachments (deliverables)
+  const addSubtaskAttachment: AppState['addSubtaskAttachment'] = useCallback((projectId, subtaskId, attachment) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            subtasks: p.subtasks.map((st) =>
+              st.id === subtaskId
+                ? { ...st, attachments: [...st.attachments, attachment] }
+                : st
+            ),
+          }
+        : p
+    ));
+  }, []);
+
+  // ---- Manual progress update
+  const updateSubtaskProgress: AppState['updateSubtaskProgress'] = useCallback((projectId, subtaskId, progress) => {
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const updatedSubtasks = p.subtasks.map((st) =>
+        st.id === subtaskId ? { ...st, progress: Math.min(100, Math.max(0, progress)) } : st
+      );
+      const totalProgress = updatedSubtasks.length > 0
+        ? Math.round(updatedSubtasks.reduce((acc, st) => acc + st.progress, 0) / updatedSubtasks.length)
+        : 0;
+      return { ...p, subtasks: updatedSubtasks, progress: totalProgress };
+    }));
+  }, []);
+
   // ---- Client meeting (post-framing report)
   const scheduleClientMeeting: AppState['scheduleClientMeeting'] = useCallback((projectId, data) => {
     setProjects((prev) => prev.map((p) =>
@@ -556,6 +587,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
     suggestModification, reviewModification,
     addSubtaskComment,
+    addSubtaskAttachment,
+    updateSubtaskProgress,
     scheduleClientMeeting,
     addEmployee, updateUser, updateProfile,
     markNotificationRead, markAllNotificationsRead,
@@ -565,6 +598,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
        suggestModification, reviewModification,
        addSubtaskComment,
+       addSubtaskAttachment,
+       updateSubtaskProgress,
        scheduleClientMeeting,
        addEmployee, updateUser, updateProfile,
        markNotificationRead, markAllNotificationsRead]);

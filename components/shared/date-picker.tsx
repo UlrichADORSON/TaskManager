@@ -51,7 +51,7 @@ export function DatePicker({ value, onChange, placeholder = 'Choisir une date', 
         <DayPicker
           mode="single"
           selected={selected}
-          onSelect={(date) => {
+          onSelect={(date: Date | undefined) => {
             if (date) {
               onChange?.(date.toISOString());
               setOpen(false);

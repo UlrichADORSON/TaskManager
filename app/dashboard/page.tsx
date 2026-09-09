@@ -151,7 +151,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((s, i) => (
           <StatCard key={s.label} {...s} delay={i * 0.06} />
         ))}
@@ -193,8 +193,8 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* Admin: pending modifications section */}
-      {role === 'admin' && allPendingMods.length > 0 && (
+      {/* Admin/Chef: pending modifications section */}
+      {(role === 'admin' || role === 'chef_de_projet') && allPendingMods.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

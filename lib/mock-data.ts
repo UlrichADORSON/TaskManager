@@ -1,6 +1,6 @@
 import type {
   User, Project, Subtask, AppNotification,
-  ProgressPoint, Attachment, ModificationRequest, CalendarEvent,
+  ProgressPoint, Attachment, CalendarEvent,
 } from '@/types';
 
 // ============================================================

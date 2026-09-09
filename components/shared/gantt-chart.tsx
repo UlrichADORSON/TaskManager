@@ -10,16 +10,15 @@ import type { Subtask } from '@/types';
 export function GanttChart({ subtasks }: { subtasks: Subtask[] }) {
   const { users } = useApp();
 
-  const { timelineStart, timelineEnd, days, rows } = useMemo(() => {
+  const { timelineStart, days, rows } = useMemo(() => {
     if (subtasks.length === 0) {
-      return { timelineStart: 0, timelineEnd: 0, days: 0, rows: [] };
+      return { timelineStart: 0, days: 0, rows: [] };
     }
     const start = Math.min(...subtasks.map((s) => new Date(s.startDate).getTime()));
     const end = Math.max(...subtasks.map((s) => new Date(s.dueDate).getTime()));
     const totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
     // Add padding
     const paddedStart = start - 2 * 24 * 60 * 60 * 1000;
-    const paddedEnd = end + 2 * 24 * 60 * 60 * 1000;
     const totalPaddedDays = totalDays + 4;
 
     const sorted = [...subtasks].sort((a, b) => {
@@ -30,7 +29,6 @@ export function GanttChart({ subtasks }: { subtasks: Subtask[] }) {
 
     return {
       timelineStart: paddedStart,
-      timelineEnd: paddedEnd,
       days: totalPaddedDays,
       rows: sorted,
     };

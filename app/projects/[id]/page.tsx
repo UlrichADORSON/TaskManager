@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const GanttChart = lazy(() => import('@/components/shared/gantt-chart').then(m => ({ default: m.GanttChart })));
 const ProgressChart = lazy(() => import('@/components/shared/progress-chart').then(m => ({ default: m.ProgressChart })));
+const KanbanBoard = lazy(() => import('@/components/shared/kanban-board').then(m => ({ default: m.KanbanBoard })));
+const SubtaskDetailDialog = lazy(() => import('@/components/shared/subtask-detail-dialog').then(m => ({ default: m.SubtaskDetailDialog })));
 import {
   ArrowLeft, Calendar, Euro, Users, FolderKanban, BarChart3,
   MessageSquare, GanttChartSquare, Info, UserCircle, CalendarDays, MapPin, Clock,
@@ -13,6 +15,7 @@ import {
   FileText, Image as ImageIcon, Edit3, AlertCircle,
   Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo,
   Phone, Mail, Building2, User as UserIcon, CalendarClock, ArrowUpRight,
+  LayoutGrid, List,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -38,18 +41,20 @@ import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
 import { ProgressBar, ProgressRing } from '@/components/shared/progress';
 import { StatCard } from '@/components/shared/stat-card';
 import {
-  getUser, formatDate, formatDateTime, formatCurrency, daysUntil, daysBetween,
-  specialtyMeta,
+  getUser, formatDate, formatDateTime, formatCurrency, daysBetween,
+  specialtyMeta, subtaskStatusMeta,
 } from '@/lib/status';
-import type { SubtaskStatus, Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User } from '@/types';
+import type { Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User } from '@/types';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 export default function ProjectDetailPage() {
   const user = useAuthGuard();
   const {
     projects, users,     validateProject, rejectProject, assignManager,
     addSubtask, addProjectMember, removeProjectMember, reviewModification,
-    suggestModification, approveSubtask, addSubtaskComment,
+    suggestModification, approveSubtask, addSubtaskComment, addSubtaskAttachment,
+    updateSubtaskStatus, updateSubtaskProgress,
     scheduleClientMeeting,
     addEmployee: addEmployeeFromContext,
   } = useApp();
@@ -85,12 +90,11 @@ export default function ProjectDetailPage() {
     newValue: '',
     reason: '',
   });
-  // Task discussion state
-  const [discussionSubtask, setDiscussionSubtask] = useState<Subtask | null>(null);
-  const [commentText, setCommentText] = useState('');
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [meetingForm, setMeetingForm] = useState({ date: '', note: '' });
   const [profileUser, setProfileUser] = useState<User | null>(null);
+  const [taskViewMode, setTaskViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [detailSubtask, setDetailSubtask] = useState<Subtask | null>(null);
 
   if (!user) return null;
   if (!project) {
@@ -108,8 +112,6 @@ export default function ProjectDetailPage() {
   const teamMembers = project.members.map((m) => ({ ...m, user: getUser(users, m.userId) })).filter((m) => m.user);
   const members = users.filter((u) => u.role === 'membre');
   const chefs = users.filter((u) => u.role === 'chef_de_projet');
-  const daysLeft = daysUntil(project.endDate);
-  const isLate = daysLeft < 0 && project.status === 'in_progress';
   const canManage = user.role === 'admin' || user.role === 'chef_de_projet';
   const isProjectMember = project.members.some((m) => m.userId === user.id);
   const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
@@ -119,6 +121,7 @@ export default function ProjectDetailPage() {
   const handleReject = () => {
     if (rejectReason.trim()) {
       rejectProject(project.id, rejectReason.trim());
+      toast({ title: 'Projet rejeté', description: `« ${project.title} » a été rejeté.` });
       setRejectOpen(false);
       setRejectReason('');
     }
@@ -138,6 +141,7 @@ export default function ProjectDetailPage() {
     });
     setNewSubtaskOpen(false);
     setNewSubtask({ title: '', description: '', priority: 'medium', assignedToId: '', startDate: '', dueDate: '', dependsOnId: '' });
+    toast({ title: 'Sous-tâche créée', description: `« ${newSubtask.title} » a été ajoutée au projet.` });
   };
 
   const handleAddMember = () => {
@@ -158,19 +162,18 @@ export default function ProjectDetailPage() {
       setAddMemberOpen(false);
       setMemberForm({ existingUserId: '', role: 'membre', createNew: false, name: '', email: '', password: '', specialty: 'Designer' });
     }
+    toast({ title: 'Membre ajouté', description: `${memberForm.createNew ? memberForm.name : getUser(users, memberForm.existingUserId)?.name} a rejoint l'équipe du projet.` });
   };
 
   const handleReview = () => {
     if (!reviewDialog) return;
     reviewModification(project.id, reviewDialog.mod.id, reviewDialog.decision, reviewNote);
+    toast({
+      title: reviewDialog.decision === 'approved' ? 'Modification approuvée' : 'Modification rejetée',
+      description: reviewDialog.decision === 'approved' ? 'La nouvelle valeur a été appliquée.' : 'La modification proposée a été refusée.',
+    });
     setReviewDialog(null);
     setReviewNote('');
-  };
-
-  const handleSendComment = () => {
-    if (!discussionSubtask || !commentText.trim()) return;
-    addSubtaskComment(project.id, discussionSubtask.id, commentText);
-    setCommentText('');
   };
 
   const handleAddMeeting = () => {
@@ -181,6 +184,7 @@ export default function ProjectDetailPage() {
     });
     setMeetingOpen(false);
     setMeetingForm({ date: '', note: '' });
+    toast({ title: 'Rendez-vous planifié', description: 'Le client sera notifié de la réunion.' });
   };
 
   const fileIcon = (type: string) => {
@@ -234,6 +238,13 @@ export default function ProjectDetailPage() {
     });
     setModReqOpen(false);
     setModReq({ target: 'project', subtaskId: '', field: 'description', newValue: '', reason: '' });
+    toast({ title: 'Demande envoyée', description: `Votre demande de modification (${modReq.field}) attend la validation.` });
+  };
+
+  const handleModificationRequestFromDetail = (subtaskId: string) => {
+    setDetailSubtask(null);
+    setModReq({ target: 'subtask', subtaskId, field: 'title', newValue: '', reason: '' });
+    setModReqOpen(true);
   };
 
   // Compute duration in weeks
@@ -295,7 +306,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard icon={Euro} label="Budget" value={formatCurrency(project.budget)} color="text-info" />
         <StatCard icon={Clock} label="Durée" value={`${durationDays} j · ${durationWeeks} sem.`} color="text-warning" />
         <StatCard icon={ListTodo} label="Sous-tâches" value={project.subtasks.length} color="text-primary" />
@@ -311,7 +322,7 @@ export default function ProjectDetailPage() {
                 <Info className="h-5 w-5 text-warning" /> Action requise — Validation du projet
               </h3>
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => validateProject(project.id)} className="bg-success hover:bg-success/90">
+                <Button onClick={() => { validateProject(project.id); toast({ title: 'Projet validé', description: `« ${project.title} » est désormais en cours.` }); }} className="bg-success hover:bg-success/90">
                   <CheckCircle2 className="h-4 w-4 mr-2" /> Valider le projet
                 </Button>
                 <Button variant="destructive" onClick={() => setRejectOpen(true)}>
@@ -340,7 +351,7 @@ export default function ProjectDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={() => selectedManager && assignManager(project.id, selectedManager)} disabled={!selectedManager}>
+              <Button onClick={() => { if (selectedManager) { assignManager(project.id, selectedManager); toast({ title: 'Chef de projet assigné', description: `${getUser(users, selectedManager)?.name} pilote désormais le projet.` }); } }} disabled={!selectedManager}>
                 Assigner
               </Button>
             </div>
@@ -638,82 +649,147 @@ export default function ProjectDetailPage() {
         {/* ---- Tasks tab (with comments) ---- */}
         <TabsContent value="tasks">
           <div>
-            {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
-              <div className="mb-4 flex justify-end">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                {project.subtasks.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setTaskViewMode('kanban')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                        taskViewMode === 'kanban'
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted/50'
+                      )}
+                    >
+                      <LayoutGrid className="h-4 w-4" /> Kanban
+                    </button>
+                    <button
+                      onClick={() => setTaskViewMode('list')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                        taskViewMode === 'list'
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted/50'
+                      )}
+                    >
+                      <List className="h-4 w-4" /> Liste
+                    </button>
+                  </>
+                )}
+              </div>
+              {canManage && project.status !== 'pending' && project.status !== 'rejected' && (
                 <Button onClick={() => setNewSubtaskOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" /> Ajouter une sous-tâche
                 </Button>
-              </div>
-            )}
-            <div className="space-y-3">
-              {project.subtasks.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p>Aucune sous-tâche définie. Le chef de projet ou l’admin doit cadrer les tâches.</p>
-                </Card>
-              ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  {project.subtasks.map((st) => {
-                    const assignee = getUser(users, st.assignedToId);
-                    return (
-                      <Card key={st.id} className="p-4 hover:shadow-card-hover hover:border-primary/20 transition-all">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-sm">{st.title}</p>
-                              <SubtaskStatusBadge status={st.status} />
-                              <PriorityBadge priority={st.priority} />
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{st.description}</p>
-                            <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(st.startDate)} → {formatDate(st.dueDate)}</span>
-                              <span className="flex items-center gap-1"><UserIcon className="h-3.5 w-3.5" /> {assignee?.name ?? 'Non assigné'}</span>
-                              <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> {st.comments.length} commentaire{st.comments.length > 1 ? 's' : ''}</span>
-                            </div>
-                            <div className="mt-3 w-48">
-                              <ProgressBar value={st.progress} indicatorClassName={st.progress < 33 ? 'bg-destructive' : st.progress < 66 ? 'bg-warning' : 'bg-success'} />
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2 items-end">
-                            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => { setDiscussionSubtask(st); setActiveTab('tasks'); }}>
-                              <MessageSquare className="h-3.5 w-3.5" /> Discussion
-                            </Button>
-                            {canManage && st.status === 'review' && (
-                              <Button size="sm" className="h-8 text-xs gap-1 bg-success hover:bg-success/90" onClick={() => approveSubtask(project.id, st.id)}>
-                                <Check className="h-3.5 w-3.5" /> Valider
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Inline comments preview */}
-                        {st.comments.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
-                            {st.comments.slice(0, 2).map((c) => {
-                              const author = getUser(users, c.authorId);
-                              return (
-                                <div key={c.id} className="flex items-start gap-2">
-                                  <UserAvatar user={author} size="sm" />
-                                  <div className="flex-1">
-                                    <p className="text-xs"><span className="font-semibold">{author?.name}</span> <span className="text-muted-foreground">· {formatDate(c.createdAt)}</span></p>
-                                    <p className="text-sm mt-0.5">{c.content}</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            {st.comments.length > 2 && (
-                              <button className="text-xs text-primary hover:underline" onClick={() => setDiscussionSubtask(st)}>
-                                Voir les {st.comments.length} commentaires
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </Card>
-                    );
-                  })}
-                </div>
               )}
             </div>
+
+            {project.subtasks.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground">
+                <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p>Aucune sous-tâche définie. Le chef de projet ou l'admin doit cadrer les tâches.</p>
+              </Card>
+            ) : taskViewMode === 'kanban' ? (
+              <Suspense fallback={<div className="h-64 flex items-center justify-center text-muted-foreground text-sm">Chargement du Kanban...</div>}>
+                <KanbanBoard
+                  subtasks={project.subtasks}
+                  users={users}
+                  canManage={canManage}
+                  currentUserId={user.id}
+                  onStatusChange={(subtaskId, status) => { updateSubtaskStatus(project.id, subtaskId, status); toast({ title: 'Statut mis à jour', description: status === 'review' ? 'La sous-tâche attend la validation.' : `Statut passé à « ${subtaskStatusMeta[status].label} ».` }); }}
+                  onOpenDetail={(st) => { setDetailSubtask(st); }}
+                  onAddDeliverable={(subtaskId, attachment) => { addSubtaskAttachment(project.id, subtaskId, attachment); toast({ title: 'Livrable ajouté', description: attachment.fileName }); }}
+                />
+              </Suspense>
+            ) : (
+              <div className="space-y-3">
+                {project.subtasks.map((st) => {
+                  const assignee = getUser(users, st.assignedToId);
+                  const deliverables = st.attachments ?? [];
+                  return (
+                    <Card key={st.id} className="p-4 hover:shadow-card-hover hover:border-primary/20 transition-all cursor-pointer" onClick={() => setDetailSubtask(st)}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm">{st.title}</p>
+                            <SubtaskStatusBadge status={st.status} />
+                            <PriorityBadge priority={st.priority} />
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{st.description}</p>
+                          <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(st.startDate)} → {formatDate(st.dueDate)}</span>
+                            <span className="flex items-center gap-1"><UserIcon className="h-3.5 w-3.5" /> {assignee?.name ?? 'Non assigné'}</span>
+                            <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> {st.comments.length} commentaire{st.comments.length > 1 ? 's' : ''}</span>
+                            {deliverables.length > 0 && (
+                              <span className="flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" /> {deliverables.length} livrable{deliverables.length > 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+
+                          {/* Deliverables preview */}
+                          {deliverables.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {deliverables.slice(0, 4).map((att) => (
+                                <div
+                                  key={att.id}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/5 border border-primary/15 text-[10px] font-medium text-primary cursor-pointer hover:bg-primary/10 transition-colors"
+                                  onClick={(e) => { e.stopPropagation(); setFileViewer({ url: att.url, fileName: att.fileName, fileType: att.fileType }); }}
+                                >
+                                  {att.fileType.startsWith('image/') ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                  <span className="truncate max-w-[80px]">{att.fileName}</span>
+                                </div>
+                              ))}
+                              {deliverables.length > 4 && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-lg bg-muted/50 text-[10px] text-muted-foreground">
+                                  +{deliverables.length - 4}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="mt-3 w-48">
+                            <ProgressBar value={st.progress} indicatorClassName={st.progress < 33 ? 'bg-destructive' : st.progress < 66 ? 'bg-warning' : 'bg-success'} />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 items-end">
+                          <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={(e) => { e.stopPropagation(); setDetailSubtask(st); }}>
+                            <MessageSquare className="h-3.5 w-3.5" /> Discussion
+                          </Button>
+                          {canManage && st.status === 'review' && (
+                            <Button size="sm" className="h-8 text-xs gap-1 bg-success hover:bg-success/90" onClick={(e) => { e.stopPropagation(); approveSubtask(project.id, st.id); toast({ title: 'Sous-tâche validée', description: `« ${st.title} » est terminée.` }); }}>
+                              <Check className="h-3.5 w-3.5" /> Valider
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Inline comments preview */}
+                      {st.comments.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                          {st.comments.slice(0, 2).map((c) => {
+                            const author = getUser(users, c.authorId);
+                            return (
+                              <div key={c.id} className="flex items-start gap-2">
+                                <UserAvatar user={author} size="sm" />
+                                <div className="flex-1">
+                                  <p className="text-xs"><span className="font-semibold">{author?.name}</span> <span className="text-muted-foreground">· {formatDate(c.createdAt)}</span></p>
+                                  <p className="text-sm mt-0.5">{c.content}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {st.comments.length > 2 && (
+                            <button className="text-xs text-primary hover:underline" onClick={(e) => { e.stopPropagation(); setDetailSubtask(st); }}>
+                              Voir les {st.comments.length} commentaires
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -884,7 +960,7 @@ export default function ProjectDetailPage() {
                                 {mod.reviewNote && <span className="italic">— « {mod.reviewNote} »</span>}
                               </div>
                             )}
-                            {mod.status === 'pending' && user.role === 'admin' && (
+                            {mod.status === 'pending' && (user.role === 'admin' || user.role === 'chef_de_projet') && (
                               <div className="mt-4 flex gap-2 pt-3 border-t border-border/50">
                                 <Button size="sm" className="bg-success hover:bg-success/90 h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}>
                                   <Check className="h-3.5 w-3.5" /> Approuver
@@ -1206,56 +1282,6 @@ export default function ProjectDetailPage() {
       </Dialog>
 
       {/* Task discussion dialog */}
-      <Dialog open={!!discussionSubtask} onOpenChange={(open) => { if (!open) { setDiscussionSubtask(null); setCommentText(''); } }}>
-        <DialogContent className="max-w-xl h-[70vh] flex flex-col">
-          {discussionSubtask && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" /> Discussion — {discussionSubtask.title}
-                </DialogTitle>
-              </DialogHeader>
-              {/* Task info */}
-              <div className="px-2 py-3 rounded-lg bg-muted/40 border border-border/50">
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span><span className="font-medium text-foreground">Assigné :</span> {getUser(users, discussionSubtask.assignedToId)?.name ?? 'Non assigné'}</span>
-                  <span><span className="font-medium text-foreground">Statut :</span> <SubtaskStatusBadge status={discussionSubtask.status} /></span>
-                  <span><span className="font-medium text-foreground">Dates :</span> {formatDate(discussionSubtask.startDate)} → {formatDate(discussionSubtask.dueDate)}</span>
-                  <span><span className="font-medium text-foreground">Progression :</span> {discussionSubtask.progress}%</span>
-                </div>
-              </div>
-              {/* Comments */}
-              <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3 my-4 px-1">
-                {discussionSubtask.comments.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-8">Aucun commentaire pour l’instant. Lancez la discussion !</p>
-                ) : discussionSubtask.comments.map((c) => {
-                  const author = getUser(users, c.authorId);
-                  const isMine = c.authorId === user.id;
-                  return (
-                    <div key={c.id} className={cn('flex items-start gap-2', isMine && 'flex-row-reverse')}>
-                      <UserAvatar user={author} size="sm" />
-                      <div className={cn('max-w-[80%] p-3 rounded-xl', isMine ? 'bg-primary text-primary-foreground' : 'bg-muted/50 border border-border/50')}>
-                        <p className={cn('text-xs font-semibold', isMine ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                          {author?.name} · {formatDate(c.createdAt)}
-                        </p>
-                        <p className="text-sm mt-1">{c.content}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Input */}
-              <div className="flex items-center gap-2 border-t border-border pt-3">
-                <Textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Écrivez un commentaire..." rows={2} className="resize-none" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendComment(); } }} />
-                <Button onClick={handleSendComment} disabled={!commentText.trim()} className="shrink-0">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Client meeting dialog */}
       <Dialog open={meetingOpen} onOpenChange={setMeetingOpen}>
         <DialogContent className="max-w-md">
@@ -1320,6 +1346,24 @@ export default function ProjectDetailPage() {
         onOpenChange={(o) => { if (!o) setProfileUser(null); }}
         canEdit={user.role === 'admin'}
       />
+
+      {/* Subtask detail dialog */}
+      <Suspense fallback={null}>
+        <SubtaskDetailDialog
+          subtask={detailSubtask}
+          users={users}
+          canManage={canManage}
+          isProjectMember={isProjectMember}
+          currentUserId={user.id}
+          open={!!detailSubtask}
+          onClose={() => setDetailSubtask(null)}
+          onStatusChange={(subtaskId, status) => updateSubtaskStatus(project.id, subtaskId, status)}
+          onProgressChange={(subtaskId, progress) => updateSubtaskProgress(project.id, subtaskId, progress)}
+          onAddComment={(subtaskId, content) => addSubtaskComment(project.id, subtaskId, content)}
+          onAddDeliverable={(subtaskId, attachment) => addSubtaskAttachment(project.id, subtaskId, attachment)}
+          onModificationRequest={handleModificationRequestFromDetail}
+        />
+      </Suspense>
     </AppShell>
   );
 }

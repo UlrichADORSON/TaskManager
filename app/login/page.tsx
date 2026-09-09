@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layers, Mail, Lock, Eye, EyeOff, Loader2, Sun, Moon, Shield, Briefcase, Wrench, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';

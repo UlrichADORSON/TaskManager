@@ -3,9 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/hooks/use-toast';
 import {
   CheckSquare, Calendar, Paperclip, Edit3,
-  Clock, AlertCircle, MessageSquare, Play, Pause, Timer,
+  AlertCircle, MessageSquare, Play, Pause, Timer,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -79,18 +80,18 @@ export default function TasksPage() {
 
   if (!user) return null;
 
-  const statusOptions: SubtaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
+  const canValidate = user.role === 'admin' || user.role === 'chef_de_projet';
 
   const availableStatuses = (status: SubtaskStatus): SubtaskStatus[] => {
-    if (status === 'review') return ['todo', 'in_progress', 'review'];
-    if (status === 'done') return ['done'];
-    return statusOptions;
+    let options: SubtaskStatus[];
+    if (status === 'review') options = ['todo', 'in_progress', 'review'];
+    else if (status === 'done') options = ['done'];
+    else options = ['todo', 'in_progress', 'review'];
+    if (!canValidate) options = options.filter((s) => s !== 'done');
+    return options;
   };
 
   const openModDialog = (task: { projectId: string; id: string; title: string; description: string; dueDate: string; priority: string }) => {
-    const fieldLabels: Record<string, string> = {
-      title: 'Titre', description: 'Description', dueDate: 'Date de fin', priority: 'Priorité',
-    };
     setModTarget({ projectId: task.projectId, subtaskId: task.id, title: task.title, field: modForm.field, oldValue: '' });
     setModForm({
       field: 'description',
@@ -254,7 +255,7 @@ export default function TasksPage() {
                       )}
 
                       <div className="ml-auto">
-                        <Select value={task.status} onValueChange={(v) => updateSubtaskStatus(task.projectId, task.id, v as SubtaskStatus)}>
+                        <Select value={task.status} onValueChange={(v) => { updateSubtaskStatus(task.projectId, task.id, v as SubtaskStatus); toast({ title: 'Statut mis à jour', description: `« ${task.title} » est maintenant « ${subtaskStatusMeta[v as SubtaskStatus].label} ».` }); }}>
                           <SelectTrigger className="w-[140px] h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>

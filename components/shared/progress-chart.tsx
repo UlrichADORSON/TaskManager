@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Area, AreaChart,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Area, AreaChart,
 } from 'recharts';
 import type { ProgressPoint } from '@/types';
 import { formatDateShort } from '@/lib/status';
