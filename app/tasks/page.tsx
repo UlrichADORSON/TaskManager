@@ -60,7 +60,7 @@ export default function TasksPage() {
       .filter((s) => s.end !== null)
       .reduce((acc, s) => acc + (s.duration || 0), 0);
     const running = task.isActive ? sessions.find((s) => s.end === null) : undefined;
-    const runningSecs = running ? (now - new Date(running.start).getTime()) / 1000 : 0;
+    const runningSecs = running ? (Math.max(Date.now(), now) - new Date(running.start).getTime()) / 1000 : 0;
     return closed + runningSecs;
   };
 

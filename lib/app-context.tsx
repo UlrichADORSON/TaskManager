@@ -300,7 +300,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             isActive: false,
             workSessions: (st.workSessions ?? []).map((s) =>
               s.end === null
-                ? { ...s, end: endedAt, duration: Math.max(0, Math.round((Date.now() - new Date(s.start).getTime()) / 1000)) }
+                ? { ...s, end: endedAt, duration: Math.max(0, Math.floor((Date.now() - new Date(s.start).getTime()) / 1000)) }
                 : s
             ),
           };
@@ -407,7 +407,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               // Pause: close the running session
               const closed = sessions.map((s) =>
                 s.end === null
-                  ? { ...s, end: now.toISOString(), duration: Math.max(0, Math.round((now.getTime() - new Date(s.start).getTime()) / 1000)) }
+                  ? { ...s, end: now.toISOString(), duration: Math.max(0, Math.floor((now.getTime() - new Date(s.start).getTime()) / 1000)) }
                   : s
               );
               return {
