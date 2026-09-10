@@ -159,7 +159,7 @@ export default function EmployeesPage() {
         ))}
       </div>
 
-      {/* Filtres en capsules */}
+      {/* Filtres */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-8">
         <div className="relative w-full lg:w-[560px] lg:shrink-0">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -178,24 +178,19 @@ export default function EmployeesPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto flex-nowrap py-1 pr-1 -mx-1 px-1 scrollbar-thin">
-          {['all', ...specialties].map((s) => {
-            const active = specialtyFilter === s;
-            return (
-              <button
-                key={s}
-                onClick={() => setSpecialtyFilter(s)}
-                className={cn(
-                  'rounded-full px-4 py-2 text-xs font-semibold transition-all',
-                  active
-                    ? 'bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(46,152,255,0.35)]'
-                    : 'bg-card border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40'
-                )}
-              >
-                {s === 'all' ? 'Toutes' : (specialtyMeta[s]?.label ?? s)}
-              </button>
-            );
-          })}
+        <div className="w-full sm:w-72 lg:w-auto lg:shrink-0">
+          <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
+            <SelectTrigger className="h-12 rounded-full bg-card border border-border/60 px-5 gap-2 shadow-card">
+              <Briefcase className="h-4 w-4 text-primary flex-shrink-0" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les postes</SelectItem>
+              {specialties.map((s) => (
+                <SelectItem key={s} value={s}>{specialtyMeta[s]?.label ?? s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

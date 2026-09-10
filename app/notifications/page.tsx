@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
   AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
+  MessageSquare, Paperclip,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -29,6 +30,8 @@ const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; colo
   subtask_reviewed: { icon: BadgeCheck, color: 'text-success bg-success/10' },
   member_created: { icon: User, color: 'text-primary bg-primary/10' },
   calendar_event: { icon: CalendarPlus, color: 'text-accent bg-accent/10' },
+  task_comment: { icon: MessageSquare, color: 'text-primary bg-primary/10' },
+  project_attachment: { icon: Paperclip, color: 'text-info bg-info/10' },
 };
 
 export default function NotificationsPage() {

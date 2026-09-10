@@ -4,18 +4,21 @@ import { useState, useMemo } from 'react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
-import { ProjectCard } from '@/components/shared/project-card';
 import { FilterBar } from '@/components/shared/filter-bar';
+import { ViewToggle, type ViewMode } from '@/components/shared/view-toggle';
+import { ProjectListView } from '@/components/shared/project-list-view';
+import { ProjectKanbanBoard } from '@/components/shared/project-kanban-board';
 import { projectStatusMeta } from '@/lib/status';
 import { motion } from 'framer-motion';
 import { FolderKanban } from 'lucide-react';
 
 export default function ProjectsPage() {
   const user = useAuthGuard();
-  const { projects } = useApp();
+  const { projects, users, updateProjectStatus } = useApp();
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<ViewMode>('kanban');
 
   const visibleProjects = useMemo(() => {
     if (!user) return [];
@@ -31,6 +34,8 @@ export default function ProjectsPage() {
 
   if (!user) return null;
 
+  const canManage = user.role === 'admin' || user.role === 'chef_de_projet';
+
   return (
     <AppShell>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -41,9 +46,12 @@ export default function ProjectsPage() {
               {visibleProjects.length} projet{visibleProjects.length > 1 ? 's' : ''} visible{visibleProjects.length > 1 ? 's' : ''}
             </p>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium bg-card border border-border shadow-card">
-            <FolderKanban className="h-3.5 w-3.5 text-primary" /> {projects.length} au total
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium bg-card border border-border shadow-card">
+              <FolderKanban className="h-3.5 w-3.5 text-primary" /> {projects.length} au total
+            </span>
+            <ViewToggle value={view} onChange={setView} />
+          </div>
         </div>
       </motion.div>
 
@@ -77,11 +85,13 @@ export default function ProjectsPage() {
           <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>Aucun projet trouvé.</p>
         </div>
+      ) : view === 'list' ? (
+        <div className="mt-4">
+          <ProjectListView projects={visibleProjects} />
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-4">
-          {visibleProjects.map((p, i) => (
-            <ProjectCard key={p.id} project={p} index={i} />
-          ))}
+        <div className="mt-4">
+          <ProjectKanbanBoard projects={visibleProjects} users={users} canManage={canManage} onMove={updateProjectStatus} />
         </div>
       )}
     </AppShell>

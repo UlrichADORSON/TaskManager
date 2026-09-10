@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import type {
   User, Project, AppNotification, Subtask, SubtaskStatus,
   ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
-  ModificationTarget, Role, MemberSpecialty,
+  ModificationTarget, Role, MemberSpecialty, CalendarEvent,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -50,6 +50,7 @@ interface AppState {
   validateProject: (projectId: string) => void;
   rejectProject: (projectId: string, reason: string) => void;
   assignManager: (projectId: string, managerId: string) => void;
+  updateProjectStatus: (projectId: string, status: ProjectStatus) => void;
   addProjectMember: (projectId: string, data: { userId: string; role: Role }) => void;
   removeProjectMember: (projectId: string, userId: string) => void;
   addSubtask: (projectId: string, data: Omit<Subtask, 'id' | 'projectId' | 'progress' | 'attachments' | 'comments' | 'createdAt'>) => void;
@@ -61,6 +62,7 @@ interface AppState {
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
   addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
   addSubtaskAttachment: (projectId: string, subtaskId: string, attachment: Attachment) => void;
+  addProjectAttachment: (projectId: string, attachment: Attachment) => void;
   updateSubtaskProgress: (projectId: string, subtaskId: string, progress: number) => void;
   scheduleClientMeeting: (projectId: string, data: { date: string; note: string }) => void;
   addEmployee: (data: { name: string; email: string; password: string; phone: string; role: 'chef_de_projet' | 'membre'; memberSpecialty?: MemberSpecialty; avatarUrl?: string; company?: string; address?: string; bio?: string }) => void;
@@ -68,13 +70,43 @@ interface AppState {
   updateProfile: (data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; memberSpecialty?: MemberSpecialty; avatarUrl?: string }) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+
+  activeUserIds: string[];
+  setUserActive: (userId: string, active: boolean) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
 
 const SESSION_KEY = 'activeUserId';
+const ACTIVE_USERS_KEY = 'taskManagerActiveUsers';
 const DEFAULT_SPECIALTIES: string[] = ['Designer', 'DevOps', 'Frontend', 'Backend', 'Fullstack', 'QA', 'Chef de projet junior', 'Autre'];
 const SPECIALTIES_KEY = 'taskManagerSpecialties';
+
+// Simulated "already connected" team members for the demo
+const SEED_ACTIVE_USERS = ['u-admin-1', 'u-mgr-1', 'u-emp-1', 'u-cli-1'];
+
+// Helper to push a notification targeting a specific recipient
+function pushNotification(setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>, data: {
+  userId: string;
+  type: AppNotification['type'];
+  title: string;
+  message: string;
+  projectId?: string;
+}) {
+  setNotifications((prev) => [
+    { id: `n-${Date.now()}-${data.userId}-${Math.random().toString(36).slice(2, 7)}`, userId: data.userId, type: data.type, title: data.title, message: data.message, projectId: data.projectId, read: false, createdAt: new Date().toISOString() },
+    ...prev,
+  ]);
+}
+
+function pushNotifications(setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>, userIds: string[], data: {
+  type: AppNotification['type'];
+  title: string;
+  message: string;
+  projectId?: string;
+}) {
+  userIds.forEach((uid) => pushNotification(setNotifications, { ...data, userId: uid }));
+}
 
 export function useApp() {
   const ctx = useContext(AppContext);
@@ -105,6 +137,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return DEFAULT_SPECIALTIES;
   });
 
+  const [activeUserIds, setActiveUserIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(ACTIVE_USERS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s));
+      }
+    } catch {
+      // storage unavailable
+    }
+    return SEED_ACTIVE_USERS;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTIVE_USERS_KEY, JSON.stringify(activeUserIds));
+    } catch {
+      // storage unavailable
+    }
+  }, [activeUserIds]);
+
+  const setUserActive = useCallback((userId: string, active: boolean) => {
+    setActiveUserIds((prev) => {
+      if (active) return prev.includes(userId) ? prev : [...prev, userId];
+      return prev.filter((id) => id !== userId);
+    });
+  }, []);
+
   useEffect(() => {
     try {
       window.localStorage.setItem(SPECIALTIES_KEY, JSON.stringify(specialties));
@@ -118,7 +179,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const id = window.localStorage.getItem(SESSION_KEY);
       if (id) {
         const user = users.find((u) => u.id === id);
-        if (user) setCurrentUser(user);
+        if (user) {
+          setCurrentUser(user);
+          setActiveUserIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        }
       }
     } catch {
       // storage unavailable
@@ -134,6 +198,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     if (!user) return false;
     setCurrentUser(user);
+    setActiveUserIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
+    setUsers((prev) => prev.map((u) =>
+      u.id === user.id ? { ...u, active: true, lastActive: new Date().toISOString() } : u
+    ));
     try {
       window.localStorage.setItem(SESSION_KEY, user.id);
     } catch {
@@ -143,13 +211,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [users]);
 
   const logout = useCallback(() => {
+    if (currentUser) {
+      setActiveUserIds((prev) => prev.filter((id) => id !== currentUser.id));
+      setUsers((prev) => prev.map((u) => u.id === currentUser.id ? { ...u, active: false } : u));
+    }
     setCurrentUser(null);
     try {
       window.localStorage.removeItem(SESSION_KEY);
     } catch {
       // ignore
     }
-  }, []);
+  }, [currentUser]);
 
   // ---- Project actions
   const submitProject: AppState['submitProject'] = useCallback((data) => {
@@ -210,6 +282,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { id: `n-${Date.now()}`, userId: proj.clientId, type: 'project_rejected', title: 'Projet rejeté', message: `Votre projet « ${proj.title} » a été rejeté.`, projectId, read: false, createdAt: new Date().toISOString() },
         ...prev,
       ]);
+    }
+  }, [projects]);
+
+  const updateProjectStatus: AppState['updateProjectStatus'] = useCallback((projectId, status) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId ? { ...p, status } : p
+    ));
+    const project = projects.find((p) => p.id === projectId);
+    if (
+      project &&
+      status === 'completed' &&
+      (project.status === 'in_progress' || project.status === 'assigned' || project.status === 'validated')
+    ) {
+      const members = project.members.map((m) => m.userId);
+      if (project.managerId) members.push(project.managerId);
+      pushNotifications(setNotifications, members, {
+        type: 'project_completed',
+        title: 'Projet terminé',
+        message: `Le projet « ${project.title} » marqué comme terminé.`,
+        projectId,
+      });
     }
   }, [projects]);
 
@@ -503,6 +596,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       content,
       createdAt: new Date().toISOString(),
     };
+    const project = projects.find((p) => p.id === projectId);
+    const subtask = project?.subtasks.find((st) => st.id === subtaskId);
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
         ? {
@@ -513,7 +608,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         : p
     ));
-  }, [currentUser]);
+    // Notify everyone concerned by the project (members, manager, client) except the author
+    if (project) {
+      const concerned = new Set<string>();
+      project.members.forEach((m) => concerned.add(m.userId));
+      if (project.managerId) concerned.add(project.managerId);
+      if (subtask?.assignedToId) concerned.add(subtask.assignedToId);
+      const recipients = Array.from(concerned).filter((uid) => uid !== currentUser.id);
+      pushNotifications(setNotifications, recipients, {
+        type: 'task_comment',
+        title: 'Nouveau commentaire',
+        message: `${currentUser.name} a commenté « ${subtask?.title ?? 'une tâche'} » : « ${content.slice(0, 90)}${content.length > 90 ? '…' : ''} »`,
+        projectId,
+      });
+    }
+  }, [currentUser, projects]);
 
   // ---- Task attachments (deliverables)
   const addSubtaskAttachment: AppState['addSubtaskAttachment'] = useCallback((projectId, subtaskId, attachment) => {
@@ -531,6 +640,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ));
   }, []);
 
+  // ---- Project attachment (client adds a file forgot during submission)
+  const addProjectAttachment: AppState['addProjectAttachment'] = useCallback((projectId, attachment) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? { ...p, attachments: [...p.attachments, attachment] }
+        : p
+    ));
+    const proj = projects.find((p) => p.id === projectId);
+    if (!proj) return;
+    const admins = users.filter((u) => u.role === 'admin').map((u) => u.id);
+    const recipients = Array.from(new Set([...admins, ...(proj.managerId ? [proj.managerId] : [])]));
+    pushNotifications(setNotifications, recipients, {
+      type: 'project_attachment',
+      title: 'Nouvelle pièce jointe',
+      message: `« ${attachment.fileName} » a été ajoutée au projet « ${proj.title} » par le client.`,
+      projectId,
+    });
+  }, [projects, users]);
+
   // ---- Manual progress update
   const updateSubtaskProgress: AppState['updateSubtaskProgress'] = useCallback((projectId, subtaskId, progress) => {
     setProjects((prev) => prev.map((p) => {
@@ -547,14 +675,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Client meeting (post-framing report)
   const scheduleClientMeeting: AppState['scheduleClientMeeting'] = useCallback((projectId, data) => {
-    setProjects((prev) => prev.map((p) =>
-      p.id === projectId ? { ...p, clientMeeting: { date: data.date, note: data.note } } : p
-    ));
+    const nowEventId = `ev-${Date.now()}`;
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const meetingEvent: CalendarEvent = {
+        id: nowEventId,
+        projectId,
+        title: 'Rendez-vous client — rapport de cadrage',
+        date: data.date,
+        type: 'rendez_vous',
+        description: data.note || undefined,
+      };
+      const exists = p.calendarEvents.some((e) => e.id === nowEventId) || p.calendarEvents.some((e) => e.type === 'rendez_vous' && e.date === data.date);
+      return {
+        ...p,
+        clientMeeting: { date: data.date, note: data.note },
+        calendarEvents: exists ? p.calendarEvents : [...p.calendarEvents, meetingEvent],
+      };
+    }));
     setNotifications((prev) => {
       const project = projects.find((p) => p.id === projectId);
       if (!project) return prev;
       return [
-        { id: `n-${Date.now()}`, userId: project.clientId, type: 'calendar_event', title: 'Rendez-vous client planifié', message: `Un rendez-vous de rapport a été planifié pour votre projet « ${project.title} ».`, projectId, read: false, createdAt: new Date().toISOString() },
+        { id: `n-${Date.now()}-${project.clientId}`, userId: project.clientId, type: 'calendar_event', title: 'Rendez-vous client planifié', message: `Un rendez-vous de rapport a été planifié pour votre projet « ${project.title} ».`, projectId, read: false, createdAt: new Date().toISOString() },
         ...prev,
       ];
     });
@@ -617,28 +760,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentUser, sessionInitialized, login, logout,
     users, projects, notifications, specialties,
     addSpecialty,
-    submitProject, validateProject, rejectProject, assignManager,
+submitProject, validateProject, rejectProject, assignManager, updateProjectStatus,
     addProjectMember, removeProjectMember,
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
     suggestModification, reviewModification,
     addSubtaskComment,
     addSubtaskAttachment,
+    addProjectAttachment,
     updateSubtaskProgress,
     scheduleClientMeeting,
     addEmployee, updateUser, updateProfile,
     markNotificationRead, markAllNotificationsRead,
+    activeUserIds, setUserActive,
   }), [currentUser, sessionInitialized, login, logout, users, projects, notifications, specialties,
        addSpecialty,
-       submitProject, validateProject, rejectProject, assignManager,
+submitProject, validateProject, rejectProject, assignManager, updateProjectStatus,
        addProjectMember, removeProjectMember,
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
        suggestModification, reviewModification,
        addSubtaskComment,
        addSubtaskAttachment,
+       addProjectAttachment,
        updateSubtaskProgress,
        scheduleClientMeeting,
        addEmployee, updateUser, updateProfile,
-       markNotificationRead, markAllNotificationsRead]);
+       markNotificationRead, markAllNotificationsRead,
+       activeUserIds, setUserActive]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

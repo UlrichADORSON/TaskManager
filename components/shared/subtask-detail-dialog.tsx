@@ -304,10 +304,11 @@ export function SubtaskDetailDialog({
                             {uploader?.name ?? 'Inconnu'} · {timeAgo(att.uploadedAt)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => setViewingFile({ url: att.url, fileName: att.fileName, fileType: att.fileType })}
                             className="h-8 w-8 rounded-lg hover:bg-primary/10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                            title="Aperçu"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -315,6 +316,7 @@ export function SubtaskDetailDialog({
                             href={att.url}
                             download={att.fileName}
                             className="h-8 w-8 rounded-lg hover:bg-primary/10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                            title="Télécharger"
                           >
                             <Download className="h-4 w-4" />
                           </a>
@@ -457,7 +459,18 @@ export function SubtaskDetailDialog({
             </div>
             <div className="p-4">
               {viewingFile.fileType.startsWith('image/') ? (
-                <img src={viewingFile.url} alt={viewingFile.fileName} className="max-w-full max-h-[70vh] rounded-lg object-contain mx-auto" />
+                <div>
+                  <div className="flex justify-center mb-3">
+                    <a
+                      href={viewingFile.url}
+                      download={viewingFile.fileName}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Télécharger
+                    </a>
+                  </div>
+                  <img src={viewingFile.url} alt={viewingFile.fileName} className="max-w-full max-h-[70vh] rounded-lg object-contain mx-auto" />
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-3" />

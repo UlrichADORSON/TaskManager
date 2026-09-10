@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, lazy, Suspense } from 'react';
+import { useState, useRef, lazy, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,9 +13,9 @@ import {
   MessageSquare, GanttChartSquare, Info, UserCircle, CalendarDays, MapPin, Clock,
   CheckCircle2, XCircle, UserCog, Plus, UserPlus,
   FileText, Image as ImageIcon, Edit3, AlertCircle,
-  Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo,
+  Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo, ShieldCheck,
   Phone, Mail, Building2, User as UserIcon, CalendarClock, ArrowUpRight,
-  LayoutGrid, List,
+  LayoutGrid, List, Upload,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -57,6 +57,7 @@ export default function ProjectDetailPage() {
     suggestModification, approveSubtask, addSubtaskComment, addSubtaskAttachment,
     updateSubtaskStatus, updateSubtaskProgress,
     scheduleClientMeeting,
+    addProjectAttachment,
     addEmployee: addEmployeeFromContext,
     specialties,
   } = useApp();
@@ -97,6 +98,7 @@ export default function ProjectDetailPage() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [taskViewMode, setTaskViewMode] = useState<'kanban' | 'list'>('kanban');
   const [detailSubtask, setDetailSubtask] = useState<Subtask | null>(null);
+  const projectAttachmentRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
   if (!project) {
@@ -116,8 +118,10 @@ export default function ProjectDetailPage() {
   const chefs = users.filter((u) => u.role === 'chef_de_projet');
   const canManage = user.role === 'admin' || user.role === 'chef_de_projet';
   const isProjectMember = project.members.some((m) => m.userId === user.id);
+  const isProjectOwner = user.role === 'client' && project.clientId === user.id;
   const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
   const pendingMods = project.modifications.filter((m) => m.status === 'pending');
+  const reviewCount = project.subtasks.filter((st) => st.status === 'review').length;
   const availableEmployees = members.filter((e) => !project.members.some((m) => m.userId === e.id));
 
   const handleReject = () => {
@@ -165,6 +169,24 @@ export default function ProjectDetailPage() {
       setMemberForm({ existingUserId: '', role: 'membre', createNew: false, name: '', email: '', password: '', specialty: 'Designer' });
     }
     toast({ title: 'Membre ajouté', description: `${memberForm.createNew ? memberForm.name : getUser(users, memberForm.existingUserId)?.name} a rejoint l'équipe du projet.` });
+  };
+
+  const handleProjectAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      const att = {
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        url: URL.createObjectURL(file),
+        uploadedBy: user.id,
+        uploadedAt: new Date().toISOString(),
+      };
+      addProjectAttachment(project.id, att);
+      toast({ title: 'Pièce jointe ajoutée', description: `« ${file.name} » a été ajoutée au projet.` });
+    });
+    if (projectAttachmentRef.current) projectAttachmentRef.current.value = '';
   };
 
   const handleReview = () => {
@@ -437,7 +459,7 @@ export default function ProjectDetailPage() {
               )}
 
               {/* Attachments */}
-              {project.attachments.length > 0 && (
+              {(project.attachments.length > 0 || isProjectOwner) && (
                 <div className="mt-5 pt-5 border-t border-border">
                   <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
                     <Paperclip className="h-4 w-4" /> Pièces jointes ({project.attachments.length})
@@ -474,6 +496,21 @@ export default function ProjectDetailPage() {
                       </div>
                     ))}
                   </div>
+
+                  {isProjectOwner && (
+                    <div className="mt-3">
+                      <input ref={projectAttachmentRef} type="file" multiple className="hidden" onChange={handleProjectAttachment} />
+                      <button
+                        type="button"
+                        onClick={() => projectAttachmentRef.current?.click()}
+                        className="w-full rounded-xl border-2 border-dashed border-border py-5 hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-primary"
+                      >
+                        <Upload className="h-5 w-5" />
+                        <span className="text-sm font-medium">Ajouter une pièce jointe</span>
+                        <span className="text-xs">Vous avez oublié un document lors de la soumission ? Envoyez-le ici.</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -689,6 +726,18 @@ export default function ProjectDetailPage() {
                 </Button>
               )}
             </div>
+
+            {canManage && reviewCount > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+                <ShieldCheck className="h-4 w-4 text-warning" />
+                <p className="text-sm text-muted-foreground flex-1 min-w-0">
+                  <span className="font-semibold text-foreground">
+                    {reviewCount} sous-tâche{reviewCount > 1 ? 's' : ''} en attente de validation.
+                  </span>{' '}
+                  Validez-les ci-dessous.
+                </p>
+              </div>
+            )}
 
             {project.subtasks.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground">
@@ -1325,8 +1374,19 @@ export default function ProjectDetailPage() {
           </DialogHeader>
           <div className="py-4">
             {fileViewer?.fileType.startsWith('image/') ? (
-              <div className="flex items-center justify-center rounded-xl bg-muted/30 p-4 max-h-[60vh] overflow-hidden">
-                <img src={fileViewer.url} alt={fileViewer.fileName} className="max-h-[55vh] max-w-full rounded-lg object-contain" />
+              <div>
+                <div className="flex justify-center mb-3">
+                  <a
+                    href={fileViewer.url}
+                    download={fileViewer.fileName}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Télécharger
+                  </a>
+                </div>
+                <div className="flex items-center justify-center rounded-xl bg-muted/30 p-4 max-h-[60vh] overflow-hidden">
+                  <img src={fileViewer.url} alt={fileViewer.fileName} className="max-h-[55vh] max-w-full rounded-lg object-contain" />
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center rounded-xl bg-muted/30 p-8 gap-3">
@@ -1355,14 +1415,14 @@ export default function ProjectDetailPage() {
       {/* Subtask detail dialog */}
       <Suspense fallback={null}>
         <SubtaskDetailDialog
-          subtask={detailSubtask}
+          subtask={detailSubtask ? (project.subtasks.find((st) => st.id === detailSubtask.id) ?? detailSubtask) : null}
           users={users}
           canManage={canManage}
           isProjectMember={isProjectMember}
           currentUserId={user.id}
           open={!!detailSubtask}
           onClose={() => setDetailSubtask(null)}
-          onStatusChange={(subtaskId, status) => updateSubtaskStatus(project.id, subtaskId, status)}
+          onStatusChange={(subtaskId, status) => { updateSubtaskStatus(project.id, subtaskId, status); setDetailSubtask(null); }}
           onProgressChange={(subtaskId, progress) => updateSubtaskProgress(project.id, subtaskId, progress)}
           onAddComment={(subtaskId, content) => addSubtaskComment(project.id, subtaskId, content)}
           onAddDeliverable={(subtaskId, attachment) => addSubtaskAttachment(project.id, subtaskId, attachment)}

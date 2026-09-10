@@ -65,11 +65,11 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
       {columns.map((col) => {
         const tasks = getColumnTasks(col.id);
         return (
-          <div key={col.id} className="flex-shrink-0 w-[300px] min-w-[300px]">
+          <div key={col.id} className="min-w-0">
             {/* Column Header */}
             <div className={cn('flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3', col.bgColor)}>
               <span className={cn('h-2.5 w-2.5 rounded-full', col.dotColor)} />
@@ -131,7 +131,18 @@ export function KanbanBoard({
             </div>
             <div className="p-4">
               {viewingFile.fileType.startsWith('image/') ? (
-                <img src={viewingFile.url} alt={viewingFile.fileName} className="max-w-full max-h-[60vh] rounded-lg object-contain mx-auto" />
+                <div>
+                  <div className="flex justify-center mb-3">
+                    <a
+                      href={viewingFile.url}
+                      download={viewingFile.fileName}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium px-3.5 py-1.5 hover:bg-primary/90 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Télécharger
+                    </a>
+                  </div>
+                  <img src={viewingFile.url} alt={viewingFile.fileName} className="max-w-full max-h-[60vh] rounded-lg object-contain mx-auto" />
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />

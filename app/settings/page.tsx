@@ -7,7 +7,6 @@ import {
   Sun, Moon, UserCircle, Mail, Briefcase, LogOut, Phone,
   Building2, MapPin, Upload, X, Check, Pencil,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
@@ -28,7 +27,6 @@ import { toast } from '@/hooks/use-toast';
 export default function SettingsPage() {
   const user = useAuthGuard();
   const { logout, users, updateProfile, specialties } = useApp();
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -255,7 +253,7 @@ export default function SettingsPage() {
         <Button
           variant="outline"
           className="text-destructive hover:bg-destructive/5"
-          onClick={() => { logout(); router.push('/login'); }}
+          onClick={() => logout()}
         >
           <LogOut className="h-4 w-4 mr-2" /> Se déconnecter
         </Button>

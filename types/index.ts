@@ -36,6 +36,8 @@ export interface User {
   address?: string;
   bio?: string;
   createdAt: string;        // ISO
+  active?: boolean;         // true when the user is currently connected
+  lastActive?: string;      // ISO — last login timestamp
 }
 
 // ------------------------------------ Attachment
@@ -166,7 +168,8 @@ export interface AppNotification {
   type: 'project_submitted' | 'project_validated' | 'project_rejected'
       | 'subtask_assigned' | 'delay_detected'
       | 'project_completed' | 'modification_requested' | 'modification_reviewed'
-      | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event';
+      | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event'
+      | 'task_comment' | 'project_attachment';
   title: string;
   message: string;
   projectId?: string;

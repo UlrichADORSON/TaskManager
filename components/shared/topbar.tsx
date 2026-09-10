@@ -25,6 +25,8 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   subtask_reviewed: '✅',
   member_created: '👤',
   calendar_event: '📅',
+  task_comment: '💬',
+  project_attachment: '📎',
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -75,7 +77,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
   };
 
   return (
@@ -174,7 +175,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden z-50"
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="font-semibold text-sm">Notifications</h3>
@@ -216,7 +217,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         {/* User dropdown */}
         <div className="relative" ref={userMenuRef}>
           <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            type="button"
+            onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-3 pl-2 sm:pl-3 border-l border-border py-1 rounded-full hover:bg-secondary/70 transition-colors pr-2"
           >
             <UserAvatar user={currentUser} size="sm" />
@@ -226,7 +228,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 <RoleBadge role={currentUser.role} />
               </div>
             </div>
-            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform hidden sm:block', userMenuOpen && 'rotate-180')} />
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', userMenuOpen && 'rotate-180')} />
           </button>
           <AnimatePresence>
             {userMenuOpen && (
@@ -235,7 +237,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden z-50"
               >
                 <div className="px-4 py-3 border-b border-border">
                   <p className="text-sm font-semibold">{currentUser.name}</p>

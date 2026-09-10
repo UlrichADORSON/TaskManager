@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, FolderKanban, Users, CheckSquare,
-  FileText, Settings, LogOut, ChevronLeft, Layers, Bell, ChevronRight,
+  FileText, Settings, LogOut, ChevronLeft, Layers, Bell, ChevronRight, UserCog,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { cn } from '@/lib/utils';
@@ -27,9 +27,12 @@ const navItems: NavItem[] = [
   { label: 'Notifications',href: '/notifications', icon: Bell,            roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
 ];
 
+const adminNavItems: NavItem[] = [
+  { label: 'Utilisateurs', href: '/admin/users', icon: UserCog, roles: ['admin'] },
+];
+
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { currentUser, logout, notifications } = useApp();
 
   if (!currentUser) return null;
@@ -66,50 +69,25 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3 space-y-1.5">
-        {items.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
-          const showBadge = item.href === '/notifications' && unreadCount > 0;
-          return (
-            <Link key={item.href} href={item.href} className={cn(
-              'group flex items-center gap-3 rounded-2xl px-2 py-2 transition-all',
-              isActive
-                ? 'bg-primary text-white shadow-lg shadow-primary/40'
-                : 'text-white/70 hover:text-white hover:bg-white/10',
-            )}>
-              <span className={cn(
-                'flex items-center justify-center h-10 w-10 rounded-xl flex-shrink-0 transition-colors',
-                isActive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/80 group-hover:bg-white/15 group-hover:text-white',
-              )}>
-                <item.icon className="h-[18px] w-[18px]" />
-              </span>
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex-1 truncate"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {!collapsed && !showBadge && (
-                <ChevronRight className={cn('h-4 w-4 flex-shrink-0 transition-all', isActive ? 'text-white rotate-90' : 'text-white/35 group-hover:text-white/70')} />
+        {items.map((item) => (
+          <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} unreadCount={item.href === '/notifications' ? unreadCount : 0} />
+        ))}
+
+        {currentUser.role === 'admin' && (
+          <>
+            <div className="flex items-center gap-2 pt-3 pb-1 px-2">
+              {collapsed ? (
+                <span className="h-px flex-1 bg-white/10" />
+              ) : (
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Administration</span>
               )}
-              {showBadge && !collapsed && (
-                <span className="bg-destructive text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-              {showBadge && collapsed && (
-                <span className="absolute top-1.5 right-1.5 bg-destructive text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+            </div>
+            {adminNavItems.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
+            ))}
+          </>
+        )}
+
         <Link href="/settings" className={cn(
           'group flex items-center gap-3 rounded-2xl px-2 py-2 transition-all',
           pathname === '/settings' ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'text-white/70 hover:text-white hover:bg-white/10',
@@ -139,7 +117,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           {!collapsed && <span>Réduire</span>}
         </button>
         <button
-          onClick={() => { logout(); router.push('/login'); }}
+          onClick={() => logout()}
           className="w-full flex items-center gap-3 rounded-2xl px-2 py-2 text-sm text-white/70 hover:text-destructive hover:bg-destructive/20 transition-colors"
         >
           <span className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 text-white/80 flex-shrink-0">
@@ -149,5 +127,55 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         </button>
       </div>
     </motion.aside>
+  );
+}
+
+function NavLink({ item, pathname, collapsed, unreadCount = 0 }: {
+  item: NavItem;
+  pathname: string | null;
+  collapsed: boolean;
+  unreadCount?: number;
+}) {
+  const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+  const showBadge = unreadCount > 0;
+  return (
+    <Link href={item.href} className={cn(
+      'group flex items-center gap-3 rounded-2xl px-2 py-2 transition-all',
+      isActive
+        ? 'bg-primary text-white shadow-lg shadow-primary/40'
+        : 'text-white/70 hover:text-white hover:bg-white/10',
+    )}>
+      <span className={cn(
+        'flex items-center justify-center h-10 w-10 rounded-xl flex-shrink-0 transition-colors',
+        isActive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/80 group-hover:bg-white/15 group-hover:text-white',
+      )}>
+        <item.icon className="h-[18px] w-[18px]" />
+      </span>
+      <AnimatePresence>
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 truncate"
+          >
+            {item.label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+      {!collapsed && !showBadge && (
+        <ChevronRight className={cn('h-4 w-4 flex-shrink-0 transition-all', isActive ? 'text-white rotate-90' : 'text-white/35 group-hover:text-white/70')} />
+      )}
+      {showBadge && !collapsed && (
+        <span className="bg-destructive text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center">
+          {unreadCount}
+        </span>
+      )}
+      {showBadge && collapsed && (
+        <span className="absolute top-1.5 right-1.5 bg-destructive text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+          {unreadCount}
+        </span>
+      )}
+    </Link>
   );
 }

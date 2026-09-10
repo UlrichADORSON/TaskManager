@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/shared/sidebar';
 import { Topbar } from '@/components/shared/topbar';
+import { NotificationToastListener } from '@/components/shared/notification-toast-listener';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -10,6 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      <NotificationToastListener />
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
 
       {mobileOpen && (
