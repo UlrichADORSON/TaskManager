@@ -156,7 +156,7 @@ export function GanttChart({ subtasks }: { subtasks: Subtask[] }) {
                   className="absolute top-0 bottom-0 border-l border-dashed border-primary/70"
                   style={{ left: `${(todayOffset / days) * 100}%` }}
                 >
-                  <span className="absolute -top-0.5 left-1 bg-primary text-white text-[9px] font-semibold rounded px-1 py-px">Auj</span>
+                  <span className="absolute -top-0.5 left-1 bg-primary text-primary-foreground text-[9px] font-semibold rounded px-1 py-px">Auj</span>
                 </div>
               )}
             </div>

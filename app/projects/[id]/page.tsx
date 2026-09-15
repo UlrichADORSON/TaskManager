@@ -593,7 +593,7 @@ export default function ProjectDetailPage() {
                   <p className="text-sm text-muted-foreground">Aucun événement planifié pour l’instant.</p>
                 ) : (
                   project.calendarEvents.map((ev) => (
-                    <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-[10px] border border-border/40 bg-[#F7FAFD]">
+                    <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-[10px] border border-border/40 bg-muted/30">
                       <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{ev.title}</p>
@@ -654,9 +654,9 @@ export default function ProjectDetailPage() {
                     <h4 className="text-sm font-medium text-muted-foreground mb-3">Événements du projet</h4>
                     <div className="space-y-2">
                       {project.calendarEvents.map((ev) => (
-                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-[#F7FAFD]">
+                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
                           <div className={cn('h-9 w-9 rounded-[12px] flex items-center justify-center flex-shrink-0',
-                            ev.type === 'rendez_vous' ? 'bg-primary text-white' : ev.type === 'cadrage' ? 'bg-info text-white' : ev.type === 'livraison' ? 'bg-success text-white' : 'bg-muted text-muted-foreground')}>
+                            ev.type === 'rendez_vous' ? 'bg-primary text-primary-foreground' : ev.type === 'cadrage' ? 'bg-info text-info-foreground' : ev.type === 'livraison' ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground')}>
                             <CalendarDays className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -674,8 +674,8 @@ export default function ProjectDetailPage() {
                       {project.subtasks.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucune sous-tâche définie.</p>
                       ) : project.subtasks.map((st) => (
-                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-[#F7FAFD]">
-                          <div className="h-9 w-9 rounded-[12px] bg-primary text-white flex items-center justify-center flex-shrink-0">
+                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
+                          <div className="h-9 w-9 rounded-[12px] bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
                             <ListTodo className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">

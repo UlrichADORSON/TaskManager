@@ -48,7 +48,7 @@ export function ProjectCard({ project, index = 0 }: { project: Project; index?: 
                   <img src={project.logoUrl} alt="Logo" className="h-full w-full object-contain" />
                 </div>
               ) : (
-                <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center text-white flex-shrink-0', bar)}>
+                <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center text-primary-foreground flex-shrink-0', bar)}>
                   <span className="font-display font-bold text-base">{project.title[0]}</span>
                 </div>
               )}

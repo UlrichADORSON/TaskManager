@@ -19,7 +19,7 @@ export function ViewToggle({ value, onChange, labels }: ViewToggleProps) {
         onClick={() => onChange('kanban')}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
-          value === 'kanban' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          value === 'kanban' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
         )}
       >
         <LayoutGrid className="h-3.5 w-3.5" />
@@ -30,7 +30,7 @@ export function ViewToggle({ value, onChange, labels }: ViewToggleProps) {
         onClick={() => onChange('list')}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
-          value === 'list' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          value === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
         )}
       >
         <Rows3 className="h-3.5 w-3.5" />

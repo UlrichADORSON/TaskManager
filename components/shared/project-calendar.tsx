@@ -13,13 +13,13 @@ import { formatDate } from '@/lib/status';
 import type { CalendarEvent, Subtask } from '@/types';
 
 const typeColor: Record<string, string> = {
-  rendez_vous: 'bg-primary text-primary-foreground',
-  deadline: 'bg-primary text-primary-foreground',
-  cadrage: 'bg-info text-white',
-  design: 'bg-foreground text-background',
-  developpement: 'bg-chart-5 text-white',
-  recette: 'bg-warning text-white',
-  livraison: 'bg-success text-white',
+  rendez_vous: 'bg-primary/15 text-primary border border-primary/20',
+  deadline: 'bg-primary/15 text-primary border border-primary/20',
+  cadrage: 'bg-info/15 text-info border border-info/20',
+  design: 'bg-foreground/10 text-foreground border border-border',
+  developpement: 'bg-chart-5/15 text-chart-5 border border-chart-5/20',
+  recette: 'bg-warning/15 text-warning border border-warning/20',
+  livraison: 'bg-success/15 text-success border border-success/20',
 };
 
 const typeLabel: Record<string, string> = {
@@ -101,7 +101,7 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
     const evts = dayEvents.map((e) => ({
       id: `event-${e.id}`,
       title: e.title,
-      cls: typeColor[e.type] ?? 'bg-primary text-primary-foreground',
+      cls: typeColor[e.type] ?? 'bg-primary/15 text-primary border border-primary/20',
       isTask: false,
     }));
     return {
@@ -221,7 +221,7 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
             <span className="inline-flex items-center gap-1.5"><ListTodo className="h-3 w-3 text-info" /> Sous-tâches</span>
             {legendTypes.map((t) => (
               <span key={t} className="inline-flex items-center gap-1.5">
-                <span className={cn('h-2.5 w-2.5 rounded-[4px]', (typeColor[t] ?? 'bg-primary').split(' ')[0])} />
+                <span className={cn('h-2.5 w-2.5 rounded-[4px]', (typeColor[t] ?? 'bg-primary').split(' ')[0].replace(/\/\d+/, ''))} />
                 {typeLabel[t] ?? t}
               </span>
             ))}
@@ -250,7 +250,7 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
                 <div className="space-y-2">
                   {selectedDayEvents.map((ev) => (
                     <div key={ev.id} className="flex items-start gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
-                      <div className={cn('h-9 w-9 rounded-[12px] flex items-center justify-center flex-shrink-0', typeColor[ev.type] ?? 'bg-primary text-white')}>
+                      <div className={cn('h-9 w-9 rounded-[12px] flex items-center justify-center flex-shrink-0', typeColor[ev.type] ?? 'bg-primary/15 text-primary border border-primary/20')}>
                         <CalendarDays className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -274,7 +274,7 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
                 <div className="space-y-2">
                   {selectedDayTasks.map((st) => (
                     <div key={st.id} className="flex items-start gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
-                      <div className="h-9 w-9 rounded-[12px] bg-primary text-white flex items-center justify-center flex-shrink-0">
+                      <div className="h-9 w-9 rounded-[12px] bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
                         <ListTodo className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">

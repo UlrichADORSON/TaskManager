@@ -510,7 +510,7 @@ export function SubtaskDetailDialog({
                     <a
                       href={viewingFile.url}
                       download={viewingFile.fileName}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
                     >
                       <Download className="h-3.5 w-3.5" /> Télécharger
                     </a>
