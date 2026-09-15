@@ -15,6 +15,7 @@ import type { AppNotification } from '@/types';
 const notificationIcon: Record<AppNotification['type'], string> = {
   project_submitted: '📂',
   project_validated: '✅',
+  project_validation_reverted: '↩️',
   project_rejected: '❌',
   subtask_assigned: '📌',
   delay_detected: '⏰',

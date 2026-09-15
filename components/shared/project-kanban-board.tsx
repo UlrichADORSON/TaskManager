@@ -248,7 +248,7 @@ function KanbanProjectCard({ project, users, canManage, onStatusChange, dragging
   const client = getUser(users, project.clientId);
   const manager = getUser(users, project.managerId);
   const idx = ORDER.indexOf(project.status);
-  const pendingMods = project.modifications.filter((m) => m.status === 'pending').length;
+  const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client').length;
 
   const move = (dir: -1 | 1) => {
     const target = ORDER[idx + dir];

@@ -81,7 +81,7 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
 
   const clientProjects = fresh && fresh.role === 'client' ? memberProjects : [];
   const totalBudget = clientProjects.reduce((acc, p) => acc + p.budget, 0);
-  const pendingMods = clientProjects.reduce((acc, p) => acc + p.modifications.filter((m) => m.status === 'pending').length, 0);
+  const pendingMods = clientProjects.reduce((acc, p) => acc + p.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client').length, 0);
   const clientAvgProgress = clientProjects.length
     ? Math.round(clientProjects.reduce((acc, p) => acc + p.progress, 0) / clientProjects.length)
     : 0;

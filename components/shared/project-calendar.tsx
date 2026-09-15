@@ -77,29 +77,37 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
 
   const byDay = (date: Date) => {
     const dayEvents = events.filter((e) => df.isSameDay(df.parseISO(e.date), date));
-    const dayTasks = subtasks.filter((st) => {
-      const s = df.parseISO(st.startDate);
-      const d = df.parseISO(st.dueDate);
-      return date >= df.startOfDay(s) && date <= df.endOfDay(d);
-    });
+    const dayTasks = subtasks.filter((st) =>
+      df.isSameDay(date, df.parseISO(st.startDate)) || df.isSameDay(date, df.parseISO(st.dueDate))
+    );
     return { dayEvents, dayTasks };
   };
 
   const dayItems = (date: Date) => {
     const { dayEvents, dayTasks } = byDay(date);
-    const tasks = dayTasks.map((t) => ({
-      id: `task-${t.id}`,
-      title: t.title,
-      cls: 'bg-info/15 text-info border border-info/20',
-      isTask: true,
-    }));
+    const tasks = dayTasks.map((t) => {
+      const s = df.startOfDay(df.parseISO(t.startDate));
+      const d = df.endOfDay(df.parseISO(t.dueDate));
+      const isStart = df.isSameDay(date, s);
+      const isEnd = df.isSameDay(date, d);
+      const cls = 'bg-info/15 text-info border border-info/20';
+      return {
+        id: `task-${t.id}`,
+        title: isStart && isEnd ? t.title : isStart ? `Début · ${t.title}` : `Fin · ${t.title}`,
+        cls,
+        isTask: true,
+      };
+    });
     const evts = dayEvents.map((e) => ({
       id: `event-${e.id}`,
       title: e.title,
       cls: typeColor[e.type] ?? 'bg-primary text-primary-foreground',
       isTask: false,
     }));
-    return { items: [...tasks, ...evts], total: tasks.length + evts.length };
+    return {
+      items: [...tasks, ...evts],
+      total: tasks.length + evts.length,
+    };
   };
 
   // Details for the selected day
@@ -107,11 +115,9 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
     ? events.filter((e) => df.isSameDay(df.parseISO(e.date), selectedDate))
     : [];
   const selectedDayTasks = selectedDate
-    ? subtasks.filter((st) => {
-        const s = df.parseISO(st.startDate);
-        const d = df.parseISO(st.dueDate);
-        return selectedDate >= df.startOfDay(s) && selectedDate <= df.endOfDay(d);
-      })
+    ? subtasks.filter((st) =>
+        df.isSameDay(selectedDate, df.parseISO(st.startDate)) || df.isSameDay(selectedDate, df.parseISO(st.dueDate))
+      )
     : [];
 
   return (
@@ -157,6 +163,8 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
         <div className="grid grid-cols-7 gap-1">
           {days.map((d) => {
             const { items, total } = dayItems(d);
+            const shown = Math.min(items.length, 3);
+            const hidden = total - shown;
             const inMonth = df.isSameMonth(d, month);
             const today = df.isToday(d);
             const hasItems = total > 0;
@@ -198,8 +206,8 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
                       {it.title}
                     </span>
                   ))}
-                  {total > 3 && (
-                    <span className="text-[10px] font-semibold text-muted-foreground px-1">+{total - 3}</span>
+                  {hidden > 0 && (
+                    <span className="text-[10px] font-semibold text-muted-foreground px-1">+{hidden}</span>
                   )}
                 </div>
               </button>

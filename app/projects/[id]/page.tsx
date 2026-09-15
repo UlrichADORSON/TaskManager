@@ -11,7 +11,7 @@ const SubtaskDetailDialog = lazy(() => import('@/components/shared/subtask-detai
 import {
   ArrowLeft, Calendar, Euro, Users, FolderKanban, BarChart3,
   MessageSquare, GanttChartSquare, Info, UserCircle, CalendarDays, MapPin, Clock,
-  CheckCircle2, XCircle, UserCog, Plus, UserPlus,
+  CheckCircle2, XCircle, UserCog, Plus, UserPlus, Undo2,
   FileText, Image as ImageIcon, Edit3, AlertCircle,
   Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo, ShieldCheck,
   Phone, Mail, Building2, User as UserIcon, CalendarClock, ArrowUpRight,
@@ -52,7 +52,7 @@ import { toast } from '@/hooks/use-toast';
 export default function ProjectDetailPage() {
   const user = useAuthGuard();
   const {
-    projects, users,     validateProject, rejectProject, assignManager,
+    projects, users,     validateProject, rejectProject, assignManager, revertProjectValidation,
     addSubtask, addProjectMember, removeProjectMember, reviewModification,
     suggestModification, approveSubtask, addSubtaskComment, addSubtaskAttachment,
     validateSubtaskAttachment,
@@ -72,6 +72,7 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<string>(initialTab && ['info', 'gantt', 'progress', 'calendar', 'tasks', 'team', 'modifications'].includes(initialTab) ? initialTab : 'info');
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [revertOpen, setRevertOpen] = useState(false);
   const [selectedManager, setSelectedManager] = useState('');
   const [newSubtaskOpen, setNewSubtaskOpen] = useState(false);
   const [newSubtask, setNewSubtask] = useState({
@@ -146,9 +147,17 @@ export default function ProjectDetailPage() {
   const isProjectMember = project.members.some((m) => m.userId === user.id);
   const isProjectOwner = user.role === 'client' && project.clientId === user.id;
   const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
-  const pendingMods = project.modifications.filter((m) => m.status === 'pending');
+  const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
   const reviewCount = project.subtasks.filter((st) => st.status === 'review').length;
   const availableEmployees = members.filter((e) => !project.members.some((m) => m.userId === e.id));
+
+  const canApproveMod = (mod: { status: string; requestedById: string }) => {
+    if (mod.status === 'pending_client') return isProjectOwner;
+    if (mod.status !== 'pending') return false;
+    const requesterRole = getUser(users, mod.requestedById)?.role;
+    if (requesterRole === 'admin') return isProjectOwner;
+    return user.role === 'admin';
+  };
 
   const handleReject = () => {
     if (rejectReason.trim()) {
@@ -217,10 +226,15 @@ export default function ProjectDetailPage() {
 
   const handleReview = () => {
     if (!reviewDialog) return;
-    reviewModification(project.id, reviewDialog.mod.id, reviewDialog.decision, reviewNote);
+    const { mod, decision } = reviewDialog;
+    reviewModification(project.id, mod.id, decision, reviewNote);
+    const requesterRole = getUser(users, mod.requestedById)?.role;
+    const appliedNow = user.role === 'client' || requesterRole === 'client' || requesterRole === 'admin';
     toast({
-      title: reviewDialog.decision === 'approved' ? 'Modification approuvée' : 'Modification rejetée',
-      description: reviewDialog.decision === 'approved' ? 'La nouvelle valeur a été appliquée.' : 'La modification proposée a été refusée.',
+      title: decision === 'approved' ? (user.role === 'client' && appliedNow ? 'Modification validée' : 'Modification approuvée') : 'Modification rejetée',
+      description: decision === 'approved'
+        ? (appliedNow ? 'La nouvelle valeur a été appliquée.' : 'La demande a été transmise au client pour validation finale.')
+        : 'La modification proposée a été refusée.',
     });
     setReviewDialog(null);
     setReviewNote('');
@@ -403,6 +417,15 @@ export default function ProjectDetailPage() {
               </Select>
               <Button onClick={() => { if (selectedManager) { assignManager(project.id, selectedManager); toast({ title: 'Chef de projet assigné', description: `${getUser(users, selectedManager)?.name} pilote désormais le projet.` }); } }} disabled={!selectedManager}>
                 Assigner
+              </Button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-primary/10 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-md">
+                <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                <p>Vous avez validé ce projet par erreur ? Annulez la validation pour le faire repasser en attente et re-décider.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setRevertOpen(true)} className="border-destructive/40 text-destructive hover:bg-destructive/10">
+                <Undo2 className="h-4 w-4 mr-2" /> Annuler la validation
               </Button>
             </div>
           </Card>
@@ -1051,7 +1074,8 @@ export default function ProjectDetailPage() {
                     <h3 className="text-sm font-semibold">Demandes de modification</h3>
                     <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
                       Besoin d’un ajustement sur le projet (titre, description, délai, priorité, budget…) ou sur une sous-tâche ?
-                      Faites une demande : l’équipe l’examinera puis l’approuvera ou la rejettera. Vous serez notifié(e) dès traitement.
+                      Faites une demande : selon l’émetteur, elle est validée par l’admin puis par le client, ou directement par le client.
+                      Vous serez notifié(e) à chaque étape.
                     </p>
                   </div>
                 </div>
@@ -1064,6 +1088,7 @@ export default function ProjectDetailPage() {
               <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-background/50">
                 <span className="font-medium text-foreground">Comprendre les statuts :</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> En attente — pas encore examinée</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-info" /> Validation client — approuvée par l’équipe, reste la validation du client</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Approuvée — le changement est appliqué</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Rejetée — un motif est indiqué</span>
               </div>
@@ -1082,7 +1107,7 @@ export default function ProjectDetailPage() {
                   const subtask = mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId) : null;
                   return (
                     <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                      <Card className={`p-5 ${mod.status === 'pending' ? 'border-warning/30' : mod.status === 'approved' ? 'border-success/30' : 'border-destructive/30'}`}>
+                      <Card className={`p-5 ${mod.status === 'pending' ? 'border-warning/30' : mod.status === 'pending_client' ? 'border-info/30' : mod.status === 'approved' ? 'border-success/30' : 'border-destructive/30'}`}>
                         <div className="flex items-start gap-4">
                           {requester && <UserAvatar user={requester} size="md" />}
                           <div className="flex-1 min-w-0">
@@ -1110,17 +1135,24 @@ export default function ProjectDetailPage() {
                               <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <p className="text-sm text-muted-foreground">{mod.reason}</p>
                             </div>
-                            {mod.status !== 'pending' && reviewer && (
+                            {mod.status === 'pending_client' && mod.teamReview && (
+                              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
+                                <Check className="h-3.5 w-3.5 text-success flex-shrink-0" />
+                                Approuvée par {getUser(users, mod.teamReview.userId)?.name ?? 'l\'équipe'}
+                                <span className="text-muted-foreground/70">— en attente de votre validation</span>
+                              </div>
+                            )}
+                            {mod.status !== 'pending' && mod.status !== 'pending_client' && reviewer && (
                               <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
                                 <Clock className="h-3.5 w-3.5" />
                                 {mod.status === 'approved' ? 'Approuvée' : 'Rejetée'} par {reviewer.name}
                                 {mod.reviewNote && <span className="italic">— « {mod.reviewNote} »</span>}
                               </div>
                             )}
-                            {mod.status === 'pending' && (user.role === 'admin' || user.role === 'chef_de_projet') && (
+                            {canApproveMod(mod) && (
                               <div className="mt-4 flex gap-2 pt-3 border-t border-border/50">
                                 <Button size="sm" className="bg-success hover:bg-success/90 h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}>
-                                  <Check className="h-3.5 w-3.5" /> Approuver
+                                  <Check className="h-3.5 w-3.5" /> {mod.status === 'pending_client' ? 'Valider' : 'Approuver'}
                                 </Button>
                                 <Button size="sm" variant="destructive" className="h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}>
                                   <XCircle className="h-3.5 w-3.5" /> Rejeter
@@ -1138,6 +1170,39 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Revert validation dialog */}
+      <Dialog open={revertOpen} onOpenChange={setRevertOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-warning" /> Annuler la validation ?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-muted-foreground">
+              <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+              <p>
+                Le projet « {project.title} » repassera en <strong className="text-foreground">attente de validation</strong>.
+                Vous pourrez alors le valider de nouveau ou le rejeter. Le client sera notifié de l&rsquo;annulation.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Confirmez-vous l&rsquo;annulation de la validation de ce projet ?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertOpen(false)}>Non, garder la validation</Button>
+            <Button onClick={() => {
+              revertProjectValidation(project.id);
+              setRevertOpen(false);
+              toast({ title: 'Validation annulée', description: `« ${project.title} » repasse en attente de validation.` });
+            }} variant="destructive">
+              <Undo2 className="h-4 w-4 mr-2" /> Oui, annuler
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject dialog */}
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
@@ -1335,6 +1400,20 @@ export default function ProjectDetailPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-4">
+            {reviewDialog && (
+              <div className="p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground flex items-start gap-2">
+                <Info className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
+                <p>
+                  {reviewDialog.mod.status === 'pending_client'
+                    ? 'Dernière étape : une fois validée par vous, la modification sera appliquée au projet.'
+                    : reviewDialog.mod.status === 'pending' && getUser(users, reviewDialog.mod.requestedById)?.role === 'admin'
+                      ? 'Cette demande vient de l’administrateur : votre validation l’appliquera directement.'
+                      : reviewDialog.decision === 'approved'
+                        ? 'Après votre approbation, la demande sera transmise au client pour validation finale.'
+                        : 'La demande sera close avec votre décision.'}
+                </p>
+              </div>
+            )}
             <div className="p-3 rounded-lg bg-muted/30 space-y-1">
               <p className="text-xs text-muted-foreground">Champ: <span className="font-medium text-foreground">{fieldLabels[reviewDialog?.mod.field ?? ''] ?? reviewDialog?.mod.field}</span></p>
               <p className="text-xs text-muted-foreground">Demandé par: <span className="font-medium text-foreground">{reviewDialog?.mod.requestedByName}</span></p>
@@ -1347,7 +1426,9 @@ export default function ProjectDetailPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setReviewDialog(null)}>Annuler</Button>
             <Button onClick={handleReview} className={reviewDialog?.decision === 'approved' ? 'bg-success hover:bg-success/90' : ''} variant={reviewDialog?.decision === 'rejected' ? 'destructive' : 'default'}>
-              {reviewDialog?.decision === 'approved' ? 'Confirmer l\'approbation' : 'Confirmer le rejet'}
+              {reviewDialog?.decision === 'approved'
+                ? (reviewDialog.mod.status === 'pending_client' ? 'Valider la modification' : 'Confirmer l\'approbation')
+                : 'Confirmer le rejet'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1365,7 +1446,7 @@ export default function ProjectDetailPage() {
             {user.role !== 'admin' && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
-                <p>Votre demande sera examinée par l’équipe (chef de projet ou administrateur). Vous recevrez une notification dès qu’elle sera traitée.</p>
+                <p>Votre demande suivra le circuit d’approbation : examinée par l’admin puis, si nécessaire, validée par le client. Vous recevrez une notification à chaque étape.</p>
               </div>
             )}
             <div>
@@ -1559,9 +1640,10 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ cla
   );
 }
 
-function ModificationStatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' }) {
+function ModificationStatusBadge({ status }: { status: 'pending' | 'pending_client' | 'approved' | 'rejected' }) {
   const config = {
     pending: { label: 'En attente', className: 'bg-warning/15 text-warning border-warning/30' },
+    pending_client: { label: 'Validation client', className: 'bg-info/15 text-info border-info/30' },
     approved: { label: 'Approuvée', className: 'bg-success/15 text-success border-success/30' },
     rejected: { label: 'Rejetée', className: 'bg-destructive/15 text-destructive border-destructive/30' },
   };

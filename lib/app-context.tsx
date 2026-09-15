@@ -48,6 +48,7 @@ interface AppState {
   addSpecialty: (name: string) => void;
   submitProject: (data: SubmitProjectData) => void;
   validateProject: (projectId: string) => void;
+  revertProjectValidation: (projectId: string) => void;
   rejectProject: (projectId: string, reason: string) => void;
   assignManager: (projectId: string, managerId: string) => void;
   updateProjectStatus: (projectId: string, status: ProjectStatus) => void;
@@ -268,6 +269,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (proj) {
       setNotifications((prev) => [
         { id: `n-${Date.now()}`, userId: proj.clientId, type: 'project_validated', title: 'Projet validé', message: `Votre projet « ${proj.title} » a été validé.`, projectId, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
+    }
+  }, [projects]);
+
+  const revertProjectValidation: AppState['revertProjectValidation'] = useCallback((projectId) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId ? { ...p, status: 'pending' as ProjectStatus, statusChangedAt: null } : p
+    ));
+    const proj = projects.find((p) => p.id === projectId);
+    if (proj) {
+      setNotifications((prev) => [
+        { id: `n-${Date.now()}`, userId: proj.clientId, type: 'project_validation_reverted', title: 'Validation annulée', message: `La validation de « ${proj.title} » a été annulée : le projet repasse en attente de validation.`, projectId, read: false, createdAt: new Date().toISOString() },
         ...prev,
       ]);
     }
@@ -541,31 +555,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'pending',
       reviewedById: null,
       reviewNote: '',
+      teamReview: null,
+      clientReview: null,
       createdAt: new Date().toISOString(),
       reviewedAt: null,
     };
     setProjects((prev) => prev.map((p) =>
       p.id === data.projectId ? { ...p, modifications: [mod, ...p.modifications] } : p
     ));
+    const proj = projects.find((p) => p.id === data.projectId);
+    const notifyUserId = currentUser.role === 'admin' && proj
+      ? proj.clientId
+      : 'u-admin-1';
     setNotifications((prev) => [
-      { id: `n-${Date.now()}`, userId: 'u-admin-1', type: 'modification_requested', title: 'Demande de modification', message: `${currentUser.name} demande une modification sur ${data.target === 'project' ? 'le projet' : 'une sous-tâche'}.`, projectId: data.projectId, read: false, createdAt: new Date().toISOString() },
+      { id: `n-${Date.now()}`, userId: notifyUserId, type: 'modification_requested', title: 'Demande de modification', message: `${currentUser.name} demande une modification sur ${data.target === 'project' ? 'le projet' : 'une sous-tâche'}.`, projectId: data.projectId, read: false, createdAt: new Date().toISOString() },
       ...prev,
     ]);
-  }, [currentUser]);
+  }, [currentUser, projects]);
 
   const reviewModification: AppState['reviewModification'] = useCallback((projectId, modificationId, decision, note) => {
     if (!currentUser) return;
+    const approver = currentUser;
+    const proj = projects.find((p) => p.id === projectId);
+    const mod = proj?.modifications.find((m) => m.id === modificationId);
+    if (!proj || !mod) return;
+
+    const requester = users.find((u) => u.id === mod.requestedById);
+    const requesterRole = requester?.role;
+    const isAdminRequester = requesterRole === 'admin';
+    const isClientApprover = approver.role === 'client';
+    const isAdminApprover = approver.role === 'admin';
+
+    // Decide the next status depending on the approval chain.
+    let nextStatus: ModificationStatus;
+    let apply = false;
+    let notifyClientPending = false;
+
+    if (decision === 'rejected') {
+      nextStatus = 'rejected';
+    } else if (isAdminRequester) {
+      // Requester = admin -> the client validates directly (final approval)
+      nextStatus = 'approved';
+      apply = true;
+    } else if (requesterRole === 'client') {
+      // Requester = client -> the admin validates directly (client is already the author)
+      nextStatus = 'approved';
+      apply = true;
+    } else {
+      // Requester = chef de projet / membre -> admin approves first, then the client validates
+      if (isAdminApprover) {
+        nextStatus = 'pending_client';
+        notifyClientPending = true;
+      } else {
+        nextStatus = 'approved';
+        apply = true;
+      }
+    }
+
+    const review = { userId: approver.id, note, at: new Date().toISOString() };
+
     setProjects((prev) => prev.map((p) => {
       if (p.id !== projectId) return p;
       const mods = p.modifications.map((m) =>
         m.id === modificationId
-          ? { ...m, status: decision as ModificationStatus, reviewedById: currentUser.id, reviewNote: note, reviewedAt: new Date().toISOString() }
+          ? {
+              ...m,
+              status: nextStatus,
+              reviewedById: approver.id,
+              reviewNote: note,
+              reviewedAt: review.at,
+              teamReview: (isAdminApprover && decision === 'approved' && !isAdminRequester) ? review : (m.teamReview ?? null),
+              clientReview: isClientApprover ? review : (m.clientReview ?? null),
+            }
           : m
       );
       let subtasks = p.subtasks;
       let projPatch: Partial<typeof p> = {};
-      const mod = p.modifications.find((m) => m.id === modificationId);
-      if (mod && decision === 'approved') {
+      if (apply) {
+        const m = mods.find((x) => x.id === modificationId);
         // Archive the original version before applying the change
         const version: ProjectVersion = {
           id: `ver-${Date.now()}`,
@@ -581,34 +648,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           reason: mod.reason,
         };
         projPatch.versions = [...(p.versions ?? []), version];
-        if (mod.subtaskId && mod.target === 'subtask') {
+        if (m && m.subtaskId && m.target === 'subtask') {
           subtasks = subtasks.map((st) => {
-            if (st.id !== mod.subtaskId) return st;
-            if (mod.field === 'title') return { ...st, title: mod.newValue };
-            if (mod.field === 'description') return { ...st, description: mod.newValue };
-            if (mod.field === 'dueDate') return { ...st, dueDate: new Date(mod.newValue).toISOString() };
-            if (mod.field === 'priority') return { ...st, priority: mod.newValue as Subtask['priority'] };
+            if (st.id !== m.subtaskId) return st;
+            if (m.field === 'title') return { ...st, title: m.newValue };
+            if (m.field === 'description') return { ...st, description: m.newValue };
+            if (m.field === 'dueDate') return { ...st, dueDate: new Date(m.newValue).toISOString() };
+            if (m.field === 'priority') return { ...st, priority: m.newValue as Subtask['priority'] };
             return st;
           });
-        } else if (mod.target === 'project') {
-          if (mod.field === 'title') projPatch.title = mod.newValue;
-          else if (mod.field === 'description') projPatch.description = mod.newValue;
-          else if (mod.field === 'endDate') projPatch.endDate = new Date(mod.newValue).toISOString();
-          else if (mod.field === 'priority') projPatch.priority = mod.newValue as Project['priority'];
-          else if (mod.field === 'budget') projPatch.budget = parseInt(mod.newValue) || 0;
+        } else if (m && m.target === 'project') {
+          if (m.field === 'title') projPatch.title = m.newValue;
+          else if (m.field === 'description') projPatch.description = m.newValue;
+          else if (m.field === 'endDate') projPatch.endDate = new Date(m.newValue).toISOString();
+          else if (m.field === 'priority') projPatch.priority = m.newValue as Project['priority'];
+          else if (m.field === 'budget') projPatch.budget = parseInt(m.newValue) || 0;
         }
       }
       return { ...p, ...projPatch, modifications: mods, subtasks };
     }));
-    const proj = projects.find((p) => p.id === projectId);
-    const mod = proj?.modifications.find((m) => m.id === modificationId);
-    if (mod) {
+
+    if (notifyClientPending) {
       setNotifications((prev) => [
-        { id: `n-${Date.now()}`, userId: mod.requestedById, type: 'modification_reviewed', title: decision === 'approved' ? 'Modification approuvée' : 'Modification rejetée', message: `Votre demande de modification (${mod.field}) a été ${decision === 'approved' ? 'approuvée' : 'rejetée'}.`, projectId, read: false, createdAt: new Date().toISOString() },
+        { id: `n-${Date.now()}`, userId: proj.clientId, type: 'modification_requested', title: 'Approbation requise', message: `La demande de modification (${mod.field}) a été approuvée par l'équipe et attend votre validation finale.`, projectId, read: false, createdAt: new Date().toISOString() },
         ...prev,
       ]);
     }
-  }, [currentUser, projects]);
+    if (nextStatus === 'approved' || nextStatus === 'rejected') {
+      setNotifications((prev) => [
+        { id: `n-${Date.now()}`, userId: mod.requestedById, type: 'modification_reviewed', title: nextStatus === 'approved' ? 'Modification approuvée' : 'Modification rejetée', message: `Votre demande de modification (${mod.field}) a été ${nextStatus === 'approved' ? 'approuvée' : 'rejetée'}.`, projectId, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
+    }
+  }, [currentUser, users, projects]);
 
   // ---- Task comments
   const addSubtaskComment: AppState['addSubtaskComment'] = useCallback((projectId, subtaskId, content) => {
@@ -829,7 +901,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentUser, sessionInitialized, login, logout,
     users, projects, notifications, specialties,
     addSpecialty,
-submitProject, validateProject, rejectProject, assignManager, updateProjectStatus,
+submitProject, validateProject, revertProjectValidation, rejectProject, assignManager, updateProjectStatus,
     addProjectMember, removeProjectMember,
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
     suggestModification, reviewModification,
@@ -844,7 +916,7 @@ submitProject, validateProject, rejectProject, assignManager, updateProjectStatu
     activeUserIds, setUserActive,
   }), [currentUser, sessionInitialized, login, logout, users, projects, notifications, specialties,
        addSpecialty,
-submitProject, validateProject, rejectProject, assignManager, updateProjectStatus,
+submitProject, validateProject, revertProjectValidation, rejectProject, assignManager, updateProjectStatus,
        addProjectMember, removeProjectMember,
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
        suggestModification, reviewModification,

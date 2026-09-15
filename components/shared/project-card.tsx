@@ -26,7 +26,7 @@ export function ProjectCard({ project, index = 0 }: { project: Project; index?: 
   const teamMembers = project.members.filter((m) => m.role === 'membre' || m.role === 'chef_de_projet');
   const daysLeft = daysUntil(project.endDate);
   const isLate = daysLeft < 0 && project.status === 'in_progress';
-  const pendingMods = project.modifications.filter((m) => m.status === 'pending');
+  const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
   const bar = statusBar[project.status] ?? 'bg-primary';
 
   return (

@@ -68,7 +68,7 @@ export function ProjectListView({ projects }: { projects: Project[] }) {
       <div className="divide-y divide-border/60 sm:hidden">
         {sorted.map((p) => {
           const client = getUser(users, p.clientId);
-          const pendingMods = p.modifications.filter((m) => m.status === 'pending');
+          const pendingMods = p.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
           return (
             <Link key={p.id} href={`/projects/${p.id}`} className="block p-4 space-y-3 hover:bg-muted/40 transition-colors">
               <div className="flex items-start justify-between gap-2">
@@ -121,7 +121,7 @@ export function ProjectListView({ projects }: { projects: Project[] }) {
             {sorted.map((p) => {
               const client = getUser(users, p.clientId);
               const teamCount = p.members.filter((m) => m.role === 'membre' || m.role === 'chef_de_projet').length;
-              const pendingMods = p.modifications.filter((m) => m.status === 'pending');
+              const pendingMods = p.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
               const duration = Math.max(1, daysBetween(p.startDate, p.endDate));
               return (
                 <tr

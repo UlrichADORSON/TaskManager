@@ -16,7 +16,7 @@ export type ProjectStatus =
 
 export type SubtaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
-export type ModificationStatus = 'pending' | 'approved' | 'rejected';
+export type ModificationStatus = 'pending' | 'pending_client' | 'approved' | 'rejected';
 
 export type ModificationTarget = 'subtask' | 'project';
 
@@ -108,6 +108,8 @@ export interface ModificationRequest {
   reviewNote: string;
   createdAt: string;
   reviewedAt: string | null;
+  teamReview?: { userId: string; note: string; at: string } | null;   // admin review (first stage)
+  clientReview?: { userId: string; note: string; at: string } | null; // client validation (final stage)
 }
 
 // ------------------------------------ Progress timeline point (for the curve chart)
@@ -188,7 +190,7 @@ export interface Project {
 export interface AppNotification {
   id: string;
   userId: string;       // recipient
-  type: 'project_submitted' | 'project_validated' | 'project_rejected'
+  type: 'project_submitted' | 'project_validated' | 'project_validation_reverted' | 'project_rejected'
       | 'subtask_assigned' | 'delay_detected'
       | 'project_completed' | 'modification_requested' | 'modification_reviewed'
       | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event'

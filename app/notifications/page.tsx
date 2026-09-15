@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
   AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
-  MessageSquare, Paperclip, SlidersHorizontal,
+  MessageSquare, Paperclip, SlidersHorizontal, Undo2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -24,6 +24,7 @@ import type { AppNotification } from '@/types';
 const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; color: string }> = {
   project_submitted: { icon: FolderKanban, color: 'text-warning bg-warning/10' },
   project_validated: { icon: CheckCircle2, color: 'text-info bg-info/10' },
+  project_validation_reverted: { icon: Undo2, color: 'text-warning bg-warning/10' },
   project_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
   subtask_assigned: { icon: CheckSquare, color: 'text-primary bg-primary/10' },
   delay_detected: { icon: AlarmClock, color: 'text-destructive bg-destructive/10' },
