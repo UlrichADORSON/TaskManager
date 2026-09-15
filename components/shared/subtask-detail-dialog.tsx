@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, MessageSquare, Paperclip, Upload, Download, Eye,
   Image as ImageIcon, FileText, Send, Edit3, CheckCircle2,
-  ChevronDown, ChevronUp, History, Sliders,
+  ChevronDown, ChevronUp, History, Sliders, XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ interface SubtaskDetailDialogProps {
   onProgressChange: (subtaskId: string, progress: number) => void;
   onAddComment: (subtaskId: string, content: string) => void;
   onAddDeliverable: (subtaskId: string, attachment: Attachment) => void;
+  onValidateAttachment?: (subtaskId: string, attachmentId: string, action: 'approve' | 'reject') => void;
   onModificationRequest: (subtaskId: string) => void;
 }
 
@@ -44,6 +45,7 @@ export function SubtaskDetailDialog({
   onProgressChange,
   onAddComment,
   onAddDeliverable,
+  onValidateAttachment,
   onModificationRequest,
 }: SubtaskDetailDialogProps) {
   const [commentText, setCommentText] = useState('');
@@ -283,17 +285,24 @@ export function SubtaskDetailDialog({
                   <Paperclip className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">Aucun livrable pour le moment</p>
                   {canManage && (
-                    <p className="text-xs mt-1">Uploadez des fichiers pour montrer l'avancement</p>
+                    <p className="text-xs mt-1">Uploadez des fichiers pour montrer l&apos;avancement</p>
                   )}
                 </div>
               ) : (
                 <div className="space-y-2">
                   {deliverables.map((att) => {
                     const uploader = getUser(users, att.uploadedBy);
+                    const needsValidation = att.validationStatus === 'pending';
+                    const isApproved = att.validationStatus === 'approved';
+                    const isRejected = att.validationStatus === 'rejected';
+                    const validatedBy = att.validatedBy ? getUser(users, att.validatedBy) : null;
                     return (
                       <div
                         key={att.id}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 transition-colors group"
+                        className={cn(
+                          'flex items-center gap-3 p-3 rounded-xl border transition-colors group',
+                          isRejected ? 'bg-destructive/5 border-destructive/25' : isApproved ? 'bg-success/[0.04] border-success/20' : 'bg-muted/30 border-border/50 hover:bg-muted/50'
+                        )}
                       >
                         <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                           {fileIcon(att.fileType)}
@@ -303,8 +312,45 @@ export function SubtaskDetailDialog({
                           <p className="text-[10px] text-muted-foreground">
                             {uploader?.name ?? 'Inconnu'} · {timeAgo(att.uploadedAt)}
                           </p>
+                          {(needsValidation || isApproved || isRejected) && (
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {isApproved && (
+                                <Badge className="bg-success/10 text-success border-success/20 text-[10px]">
+                                  <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Validé{validatedBy ? ` par ${validatedBy.name}` : ''}
+                                </Badge>
+                              )}
+                              {isRejected && (
+                                <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px]">
+                                  <XCircle className="h-2.5 w-2.5 mr-0.5" /> Refusé{validatedBy ? ` par ${validatedBy.name}` : ''}
+                                </Badge>
+                              )}
+                              {needsValidation && (
+                                <Badge className="bg-warning/15 text-warning border-warning/30 text-[10px]">
+                                  En attente de validation
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5">
+                          {canManage && needsValidation && onValidateAttachment && (
+                            <>
+                              <button
+                                onClick={() => onValidateAttachment(subtask.id, att.id, 'approve')}
+                                className="h-8 px-2 rounded-lg bg-success/10 text-success hover:bg-success/20 flex items-center gap-1 transition-colors text-xs font-medium"
+                                title="Valider le livrable"
+                              >
+                                <CheckCircle2 className="h-4 w-4" /> Valider
+                              </button>
+                              <button
+                                onClick={() => onValidateAttachment(subtask.id, att.id, 'reject')}
+                                className="h-8 px-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center gap-1 transition-colors text-xs font-medium"
+                                title="Refuser le livrable"
+                              >
+                                <XCircle className="h-4 w-4" /> Refuser
+                              </button>
+                            </>
+                          )}
                           <button
                             onClick={() => setViewingFile({ url: att.url, fileName: att.fileName, fileType: att.fileType })}
                             className="h-8 w-8 rounded-lg hover:bg-primary/10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"

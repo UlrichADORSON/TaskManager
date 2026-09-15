@@ -32,6 +32,7 @@ export interface User {
   avatarUrl: string;
   password?: string;         // demo auth (frontend-only prototype)
   phone?: string;
+  whatsapp?: string;
   company?: string;         // for clients
   address?: string;
   bio?: string;
@@ -48,6 +49,10 @@ export interface Attachment {
   url: string;
   uploadedBy: string;       // user id
   uploadedAt: string;       // ISO
+  attachmentType?: 'project' | 'subtask_deliverable' | 'comment';  // source
+  validationStatus?: 'pending' | 'approved' | 'rejected';  // admin validation for comment attachments
+  validatedBy?: string;     // user id who validated
+  validatedAt?: string;     // ISO
 }
 
 // ------------------------------------ Subtask Comment (discussion per task)
@@ -129,6 +134,21 @@ export interface CalendarEvent {
   description?: string;
 }
 
+// ------------------------------------ Project version (history archive)
+export interface ProjectVersion {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  priority: Priority;
+  category: string;
+  subtasks: Subtask[];
+  capturedAt: string;      // ISO — when the version was snapshotted
+  reason: string;          // modification reason that triggered the snapshot
+}
+
 // ------------------------------------ Project
 export interface Project {
   id: string;
@@ -159,6 +179,9 @@ export interface Project {
   // Client meeting after framing
   clientMeeting?: { date: string; note: string } | null;
   createdAt: string;
+  // History / archive
+  statusChangedAt?: string | null;  // ISO — when the project reached completed/rejected
+  versions?: ProjectVersion[];      // archived snapshots of modified projects
 }
 
 // ------------------------------------ Notification

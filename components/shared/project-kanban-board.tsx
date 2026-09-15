@@ -210,7 +210,7 @@ function ValidationCard({ project, users, canManage, dragging, onDragStart, onDr
       onDragStart={(e) => { if (canManage) { e.dataTransfer.setData('text/plain', project.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(); } }}
       onDragEnd={onDragEnd}
       className={cn(
-        'w-full text-left rounded-xl border border-warning/25 bg-card p-3.5 shadow-card hover:shadow-card-hover hover:border-warning/50 transition-all cursor-pointer group',
+        'w-full text-left rounded-xl border border-warning/25 bg-card p-3.5 shadow-sm hover:shadow-soft-lg hover:border-warning/50 transition-all cursor-pointer group',
         canManage && 'cursor-grab active:cursor-grabbing',
         dragging && 'opacity-50'
       )}
@@ -265,7 +265,7 @@ function KanbanProjectCard({ project, users, canManage, onStatusChange, dragging
       onDragStart={(e) => { if (canManage) { e.dataTransfer.setData('text/plain', project.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(); } }}
       onDragEnd={onDragEnd}
       className={cn(
-        'w-full text-left rounded-xl border border-border/60 bg-card p-3.5 shadow-card hover:shadow-card-hover hover:border-primary/25 transition-all cursor-pointer group',
+        'w-full text-left rounded-xl border border-border bg-card p-3.5 shadow-sm hover:shadow-soft-lg hover:border-border/80 transition-all cursor-pointer group',
         canManage && 'cursor-grab active:cursor-grabbing',
         dragging && 'opacity-50'
       )}

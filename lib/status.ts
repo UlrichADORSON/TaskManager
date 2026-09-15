@@ -1,6 +1,21 @@
 import type {
-  ProjectStatus, SubtaskStatus, Priority, Role, User,
+  ProjectStatus, SubtaskStatus, Priority, Role, User, Project,
 } from '@/types';
+
+// How long a project stays visible in the "Terminé / Rejeté" section before being archived
+export const HISTORY_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24h
+
+export function isTerminalStatus(status: ProjectStatus): boolean {
+  return status === 'completed' || status === 'rejected';
+}
+
+// A terminal project is "archived" once its status hasn't changed for more than 24h
+export function isProjectArchived(project: Project, now = Date.now()): boolean {
+  if (!isTerminalStatus(project.status)) return false;
+  const changedAt = project.statusChangedAt;
+  if (!changedAt) return true; // unknown date → treat as archived
+  return now - new Date(changedAt).getTime() >= HISTORY_GRACE_PERIOD_MS;
+}
 
 export function getUser(users: User[], id: string | null | undefined): User | undefined {
   if (!id) return undefined;

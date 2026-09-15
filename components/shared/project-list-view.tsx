@@ -204,7 +204,7 @@ export function ProjectListView({ projects }: { projects: Project[] }) {
 
 function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border/50 bg-card shadow-card overflow-hidden">
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
       {children}
     </div>
   );

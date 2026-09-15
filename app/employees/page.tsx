@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound, ArrowUpRight, Search, Briefcase } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -26,6 +27,7 @@ import type { MemberSpecialty, User } from '@/types';
 export default function EmployeesPage() {
   const user = useAuthGuard();
   const { users, projects, addEmployee, specialties, addSpecialty } = useApp();
+  const router = useRouter();
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -38,6 +40,10 @@ export default function EmployeesPage() {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    if (user && user.role === 'client') router.replace('/projects');
+  }, [user, router]);
 
   const [form, setForm] = useState({
     name: '', email: '', password: '', phone: '',
@@ -54,30 +60,53 @@ export default function EmployeesPage() {
       if (!user) return [];
       const q = debouncedSearch.trim().toLowerCase();
       let list = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
+      // Clients and membres only see members assigned to their projects
+      if (user.role === 'client' || user.role === 'membre') {
+        const projectMemberIds = new Set<string>();
+        projects.forEach((p) => {
+          const isMyProject = p.clientId === user.id || p.subtasks.some((st) => st.assignedToId === user.id) || p.members?.some((m) => m.userId === user.id);
+          if (isMyProject) {
+            p.members?.forEach((m) => projectMemberIds.add(m.userId));
+            p.subtasks.forEach((st) => { if (st.assignedToId) projectMemberIds.add(st.assignedToId); });
+            if (p.managerId) projectMemberIds.add(p.managerId);
+          }
+        });
+        list = list.filter((u) => projectMemberIds.has(u.id));
+      }
       if (specialtyFilter !== 'all') list = list.filter((u) => u.memberSpecialty === specialtyFilter);
       if (q) list = list.filter((u) => u.name.toLowerCase().includes(q) || (u.memberSpecialty ?? '').toLowerCase().includes(q));
       return list;
     } catch {
       return [];
     }
-  }, [user, users, specialtyFilter, debouncedSearch]);
+  }, [user, users, projects, specialtyFilter, debouncedSearch]);
 
   const teamStats = useMemo(() => {
     const team = users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet');
-    const byUser: Record<string, { total: number; done: number; active: number }> = {};
+    const byUser: Record<string, { total: number; done: number; active: number; review: number }> = {};
     projects.forEach((p) => {
       p.subtasks.forEach((st) => {
         if (!st.assignedToId) return;
-        const rec = byUser[st.assignedToId] ?? { total: 0, done: 0, active: 0 };
+        const rec = byUser[st.assignedToId] ?? { total: 0, done: 0, active: 0, review: 0 };
         rec.total += 1;
         if (st.status === 'done') rec.done += 1;
-        if (st.status === 'in_progress' || st.status === 'review') rec.active += 1;
+        if (st.status === 'in_progress') rec.active += 1;
+        if (st.status === 'review') rec.review += 1;
         byUser[st.assignedToId] = rec;
       });
     });
     const activePersons = team.filter((u) => (byUser[u.id]?.active ?? 0) > 0).length;
+    const reviewPersons = team.filter((u) => (byUser[u.id]?.review ?? 0) > 0).length;
     const activeTasks = team.reduce((acc, u) => acc + (byUser[u.id]?.active ?? 0), 0);
-    return { byUser, activePersons, activeTasks, teamCount: team.length };
+    const reviewTasks = team.reduce((acc, u) => acc + (byUser[u.id]?.review ?? 0), 0);
+    return {
+      byUser,
+      activePersons,
+      reviewPersons,
+      activeTasks,
+      reviewTasks,
+      teamCount: team.length,
+    };
   }, [users, projects]);
 
   if (!user) return null;
@@ -115,8 +144,8 @@ export default function EmployeesPage() {
 
   const stats = [
     { badge: 'Équipe', badgeCls: 'bg-primary/10 text-primary', value: teamStats.teamCount, label: 'membres & chefs de projet' },
-    { badge: 'En activité', badgeCls: 'bg-success/10 text-success', value: teamStats.activePersons, label: 'personnes en charge de tâches en cours' },
-    { badge: 'En cours', badgeCls: 'bg-warning/10 text-warning', value: teamStats.activeTasks, label: 'tâches en cours ou en révision' },
+    { badge: 'En activité', badgeCls: 'bg-success/10 text-success', value: teamStats.activePersons, label: 'membres avec des tâches en cours' },
+    { badge: 'En révision', badgeCls: 'bg-warning/10 text-warning', value: teamStats.reviewPersons, label: 'membres avec des tâches en révision' },
   ];
 
   return (
@@ -124,7 +153,11 @@ export default function EmployeesPage() {
       {/* Header */}
       <div className="flex items-end justify-between gap-4 mb-8">
         <div>
-          <h2 className="font-display text-4xl font-bold tracking-tight leading-none">Équipe<span className="text-primary"> ·</span></h2>
+          <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-none">
+            {user.role === 'admin' || user.role === 'chef_de_projet'
+              ? 'Tous les membres de l’entreprise'
+              : 'Tous les membres du projet'}<span className="text-primary"> ·</span>
+          </h2>
           <p className="text-sm text-muted-foreground mt-2">
             {visibleUsers.length} membre{visibleUsers.length > 1 ? 's' : ''} affiché{visibleUsers.length > 1 ? 's' : ''}
           </p>
@@ -148,7 +181,7 @@ export default function EmployeesPage() {
       {/* Statistiques */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {stats.map((s) => (
-          <div key={s.badge} className="relative overflow-hidden rounded-[24px] bg-card border border-border/60 shadow-card p-6">
+          <div key={s.badge} className="relative overflow-hidden rounded-xl bg-card border border-border shadow-sm p-6">
             <div className="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-primary/5 blur-2xl pointer-events-none" />
             <span className={cn('relative inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest', s.badgeCls)}>
               {s.badge}
@@ -196,7 +229,7 @@ export default function EmployeesPage() {
 
       {/* Section membres */}
       {visibleUsers.length === 0 ? (
-        <div className="text-center py-16 rounded-[24px] bg-card border border-border/60 shadow-card text-muted-foreground">
+        <div className="text-center py-16 rounded-xl bg-card border border-border shadow-sm text-muted-foreground">
           <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>Aucune personne trouvée.</p>
         </div>
@@ -204,7 +237,7 @@ export default function EmployeesPage() {
         <>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
-              <h3 className="font-display text-lg font-bold tracking-tight">Membres de l’équipe</h3>
+              <h3 className="font-display text-lg font-bold tracking-tight">Membres</h3>
               <span className="inline-flex items-center justify-center h-7 min-w-7 px-2 rounded-full bg-primary/10 text-primary text-xs font-bold">
                 {visibleUsers.length}
               </span>
@@ -232,7 +265,7 @@ export default function EmployeesPage() {
                     transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3) }}
                   >
                     <Card
-                      className="group relative cursor-pointer overflow-hidden rounded-[24px] border-border/60 bg-card p-6 shadow-card hover:-translate-y-1 hover:shadow-card-hover hover:border-primary/30 transition-all duration-300"
+                      className="group relative cursor-pointer overflow-hidden p-6 hover:-translate-y-1 hover:shadow-soft-lg hover:border-border/80 transition-all duration-300"
                       onClick={() => setSelectedUser(u)}
                     >
                       <div className="absolute -top-16 -right-16 h-44 w-44 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
@@ -270,6 +303,18 @@ export default function EmployeesPage() {
                               className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
                             >
                               <Phone className="h-3 w-3" /> {u.phone}
+                            </a>
+                          )}
+                          {u.whatsapp && (
+                            <a
+                              href={`https://wa.me/${u.whatsapp.replace(/[^0-9]/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
+                            >
+                              <svg viewBox="0 0 24 24" className="h-3 w-3 flex-shrink-0 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                              {u.whatsapp}
                             </a>
                           )}
                         </div>

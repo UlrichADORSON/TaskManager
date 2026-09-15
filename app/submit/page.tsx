@@ -43,11 +43,12 @@ export default function SubmitProjectPage() {
     priority: 'medium' as Priority,
     startDate: '',
     endDate: '',
-    platformUsers: '',
-    desiredFeatures: '',
-    necessaryPages: '',
-    plannedFeatures: '',
   });
+  const [platformUsers, setPlatformUsers] = useState<string[]>([]);
+  const [platformUserInput, setPlatformUserInput] = useState('');
+  const [desiredFeatures, setDesiredFeatures] = useState<string[]>([]);
+  const [necessaryPages, setNecessaryPages] = useState<string[]>([]);
+  const [plannedFeatures, setPlannedFeatures] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [logoPreview, setLogoPreview] = useState<string | undefined>(undefined);
@@ -84,6 +85,18 @@ export default function SubmitProjectPage() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const addPlatformUser = () => {
+    const value = platformUserInput.trim();
+    if (!value) return;
+    if (platformUsers.some((u) => u.toLowerCase() === value.toLowerCase())) return;
+    setPlatformUsers((prev) => [...prev, value]);
+    setPlatformUserInput('');
+  };
+
+  const removePlatformUser = (value: string) => {
+    setPlatformUsers((prev) => prev.filter((u) => u !== value));
+  };
+
   const removeLogo = () => {
     setLogoUrl(undefined);
     setLogoPreview(undefined);
@@ -102,10 +115,10 @@ export default function SubmitProjectPage() {
       endDate: new Date(form.endDate).toISOString(),
       logoUrl,
       attachments,
-      platformUsers: form.platformUsers,
-      desiredFeatures: form.desiredFeatures,
-      necessaryPages: form.necessaryPages,
-      plannedFeatures: form.plannedFeatures,
+      platformUsers: platformUsers.join('\n'),
+      desiredFeatures: desiredFeatures.join(', '),
+      necessaryPages: necessaryPages.join(', '),
+      plannedFeatures: plannedFeatures.join(', '),
     });
     setSubmitted(true);
   };
@@ -134,7 +147,12 @@ export default function SubmitProjectPage() {
             <Button onClick={() => router.push('/dashboard')}>Retour au dashboard</Button>
             <Button variant="outline" onClick={() => {
               setSubmitted(false);
-              setForm({ title: '', description: '', category: '', budget: '', priority: 'medium', startDate: '', endDate: '', platformUsers: '', desiredFeatures: '', necessaryPages: '', plannedFeatures: '' });
+              setForm({ title: '', description: '', category: '', budget: '', priority: 'medium', startDate: '', endDate: '' });
+              setPlatformUsers([]);
+              setPlatformUserInput('');
+              setDesiredFeatures([]);
+              setNecessaryPages([]);
+              setPlannedFeatures([]);
               setAttachments([]);
               setLogoUrl(undefined);
               setLogoPreview(undefined);
@@ -155,7 +173,10 @@ export default function SubmitProjectPage() {
   const completion = Math.min(100, Math.round((
     [
       form.title, form.description, form.startDate, form.endDate, form.budget, form.category,
-      form.platformUsers, form.desiredFeatures, form.necessaryPages, form.plannedFeatures,
+      (platformUsers.length > 0 ? 'x' : ''),
+      (desiredFeatures.length > 0 ? 'x' : ''),
+      (necessaryPages.length > 0 ? 'x' : ''),
+      (plannedFeatures.length > 0 ? 'x' : ''),
     ].filter(Boolean).length / 10
   ) * 100));
 
@@ -239,25 +260,73 @@ export default function SubmitProjectPage() {
 
             <div>
               <Label htmlFor="platformUsers">Utilisateurs de la plateforme</Label>
-              <Textarea id="platformUsers" value={form.platformUsers} onChange={(e) => setForm({ ...form, platformUsers: e.target.value })} placeholder="Ex: Administrateurs, clients, gestionnaires de stock, livreurs..." rows={2} />
-              <p className="text-xs text-muted-foreground mt-1">Décrivez les types d’utilisateurs qui utiliseront votre plateforme.</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <Input
+                  id="platformUsers"
+                  value={platformUserInput}
+                  onChange={(e) => setPlatformUserInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPlatformUser(); } }}
+                  placeholder="Ex: Administrateurs"
+                />
+                <Button type="button" variant="outline" onClick={addPlatformUser} disabled={!platformUserInput.trim()}>
+                  Ajouter
+                </Button>
+              </div>
+              {platformUsers.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {platformUsers.map((u) => (
+                    <span
+                      key={u}
+                      className="group inline-flex items-center gap-1.5 rounded-full bg-muted/70 border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                      {u}
+                      <button
+                        type="button"
+                        onClick={() => removePlatformUser(u)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label={`Retirer ${u}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1.5">Ajoutez un à un les types d’utilisateurs qui utiliseront votre plateforme (Ex: Clients, livreurs, gestionnaires de stock…).</p>
             </div>
 
             <div>
-              <Label htmlFor="desiredFeatures">Fonctionnalités souhaitées</Label>
-              <Textarea id="desiredFeatures" value={form.desiredFeatures} onChange={(e) => setForm({ ...form, desiredFeatures: e.target.value })} placeholder="Ex: Catalogue produits, panier, paiement en ligne, espace client, notifications..." rows={3} />
+              <ChipListInput
+                id="desiredFeatures"
+                label="Fonctionnalités souhaitées"
+                values={desiredFeatures}
+                onChange={setDesiredFeatures}
+                placeholder="Ex: Catalogue produits"
+                helper="Tapez un élément puis une virgule pour l'ajouter (Ex: panier, paiement en ligne, espace client…)."
+              />
             </div>
 
             <div>
-              <Label htmlFor="necessaryPages">Pages nécessaires pour le projet</Label>
-              <Textarea id="necessaryPages" value={form.necessaryPages} onChange={(e) => setForm({ ...form, necessaryPages: e.target.value })} placeholder="Ex: Accueil, Catalogue, Fiche produit, Panier, Checkout, Espace client, Admin..." rows={3} />
-              <p className="text-xs text-muted-foreground mt-1">Listez les pages que vous souhaitez voir dans votre projet.</p>
+              <ChipListInput
+                id="necessaryPages"
+                label="Pages nécessaires pour le projet"
+                values={necessaryPages}
+                onChange={setNecessaryPages}
+                placeholder="Ex: Accueil"
+                helper="Ajoutez chaque page en la séparant par une virgule (Ex: Catalogue, Fiche produit, Panier, Checkout…)."
+              />
             </div>
 
             <div>
-              <Label htmlFor="plannedFeatures">Fonctionnalités prévues</Label>
-              <Textarea id="plannedFeatures" value={form.plannedFeatures} onChange={(e) => setForm({ ...form, plannedFeatures: e.target.value })} placeholder="Ex: Gestion multi-boutique, promos, avis, intégration analytics..." rows={3} />
-              <p className="text-xs text-muted-foreground mt-1">Fonctionnalités que vous prévoyez d’ajouter, même ultérieurement.</p>
+              <ChipListInput
+                id="plannedFeatures"
+                label="Fonctionnalités prévues"
+                values={plannedFeatures}
+                onChange={setPlannedFeatures}
+                placeholder="Ex: Gestion multi-boutique"
+                helper="Ajoutez vos éléments séparés par des virgules pour les voir s'afficher en liste."
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -405,5 +474,84 @@ export default function SubmitProjectPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+interface ChipListInputProps {
+  id: string;
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  placeholder: string;
+  helper?: string;
+}
+
+function ChipListInput({ id, label, values, onChange, placeholder, helper }: ChipListInputProps) {
+  const [draft, setDraft] = useState('');
+
+  const commitDraft = () => {
+    const parts = draft.split(',');
+    if (parts.every((p) => !p.trim())) { setDraft(''); return; }
+    const next = [...values];
+    parts.forEach((p) => {
+      const v = p.trim();
+      if (!v) return;
+      if (!next.some((x) => x.toLowerCase() === v.toLowerCase())) next.push(v);
+    });
+    onChange(next);
+    setDraft('');
+  };
+
+  const removeChip = (chip: string) => onChange(values.filter((v) => v !== chip));
+
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="mt-1.5">
+        <Input
+          id={id}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === ',' || e.key === 'Enter') {
+              e.preventDefault();
+              commitDraft();
+            }
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text');
+            const parts = text.split(',').map((p) => p.trim()).filter(Boolean);
+            const next = [...values];
+            parts.forEach((v) => { if (!next.some((x) => x.toLowerCase() === v.toLowerCase())) next.push(v); });
+            onChange(next);
+          }}
+          onBlur={commitDraft}
+          placeholder={placeholder}
+        />
+      </div>
+      {values.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {values.map((v) => (
+            <span
+              key={v}
+              className="group inline-flex items-center gap-1.5 rounded-full bg-muted/70 border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+              {v}
+              <button
+                type="button"
+                onClick={() => removeChip(v)}
+                className="text-muted-foreground hover:text-destructive transition-colors"
+                aria-label={`Retirer ${v}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {helper && <p className="text-xs text-muted-foreground mt-1.5">{helper}</p>}
+    </div>
   );
 }

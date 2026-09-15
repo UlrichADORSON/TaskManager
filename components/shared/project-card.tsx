@@ -37,9 +37,9 @@ export function ProjectCard({ project, index = 0 }: { project: Project; index?: 
       transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.3) }}
     >
       <Link href={`/projects/${project.id}`}>
-        <Card className="group relative h-full overflow-hidden rounded-[24px] border border-border/40 bg-card p-6 cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-[0_14px_30px_-12px_rgba(0,0,0,0.08)] hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.14)]">
+        <Card className="group relative h-full overflow-hidden p-6 cursor-pointer hover:shadow-soft-lg hover:border-border/80">
           {/* Ruban vertical gauche — couleur du projet */}
-          <span className={cn('absolute left-0 top-6 bottom-6 w-1 rounded-r-full', bar)} />
+          <span className={cn('absolute left-0 top-0 bottom-0 w-1', bar)} />
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

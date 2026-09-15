@@ -1,11 +1,12 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
   AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
-  MessageSquare, Paperclip,
+  MessageSquare, Paperclip, SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -13,6 +14,9 @@ import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { timeAgo } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import type { AppNotification } from '@/types';
@@ -34,15 +38,39 @@ const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; colo
   project_attachment: { icon: Paperclip, color: 'text-info bg-info/10' },
 };
 
+const notificationFilters: { value: AppNotification['type'] | 'all'; label: string }[] = [
+  { value: 'all', label: 'Toutes' },
+  { value: 'project_submitted', label: 'Soumissions' },
+  { value: 'project_validated', label: 'Validations' },
+  { value: 'project_rejected', label: 'Rejets' },
+  { value: 'project_completed', label: 'Terminés' },
+  { value: 'subtask_assigned', label: 'Assignations' },
+  { value: 'subtask_reviewed', label: 'Révisions' },
+  { value: 'modification_requested', label: 'Modifications' },
+  { value: 'modification_reviewed', label: 'Modifs révisées' },
+  { value: 'delay_detected', label: 'Retards' },
+  { value: 'calendar_event', label: 'Rendez-vous' },
+  { value: 'task_comment', label: 'Commentaires' },
+  { value: 'project_attachment', label: 'Pièces jointes' },
+  { value: 'member_added', label: 'Membres ajoutés' },
+  { value: 'member_created', label: 'Comptes créés' },
+];
+
 export default function NotificationsPage() {
   const user = useAuthGuard();
   const { notifications, markNotificationRead, markAllNotificationsRead } = useApp();
   const router = useRouter();
+  const [typeFilter, setTypeFilter] = useState<AppNotification['type'] | 'all'>('all');
+
+  const userNotifs = useMemo(
+    () => (user
+      ? notifications.filter((n) => n.userId === user.id && (typeFilter === 'all' || n.type === typeFilter))
+      : []),
+    [notifications, user, typeFilter],
+  );
+  const unreadCount = user ? notifications.filter((n) => n.userId === user.id && !n.read).length : 0;
 
   if (!user) return null;
-
-  const userNotifs = notifications.filter((n) => n.userId === user.id);
-  const unreadCount = userNotifs.filter((n) => !n.read).length;
 
   return (
     <AppShell>
@@ -56,6 +84,24 @@ export default function NotificationsPage() {
             <CheckCheck className="h-4 w-4" /> Tout marquer comme lu
           </Button>
         )}
+      </div>
+
+      {/* Type filter */}
+      <div className="flex items-center gap-3 mb-4">
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AppNotification['type'] | 'all')}>
+          <SelectTrigger className="w-full sm:w-72 h-11 rounded-full bg-card border border-border/60 px-5 gap-2 shadow-card">
+            <SlidersHorizontal className="h-4 w-4 text-primary flex-shrink-0" />
+            <SelectValue placeholder="Filtrer par type" />
+          </SelectTrigger>
+          <SelectContent>
+            {notificationFilters.map((f) => (
+              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground hidden sm:block">
+          {userNotifs.length} notification{userNotifs.length > 1 ? 's' : ''} affichée{userNotifs.length > 1 ? 's' : ''}
+        </p>
       </div>
 
       {userNotifs.length === 0 ? (

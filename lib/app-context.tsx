@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import type {
   User, Project, AppNotification, Subtask, SubtaskStatus,
   ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
-  ModificationTarget, Role, MemberSpecialty, CalendarEvent,
+  ModificationTarget, Role, MemberSpecialty, CalendarEvent, ProjectVersion,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -62,6 +62,7 @@ interface AppState {
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
   addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
   addSubtaskAttachment: (projectId: string, subtaskId: string, attachment: Attachment) => void;
+  validateSubtaskAttachment: (projectId: string, subtaskId: string, attachmentId: string, action: 'approve' | 'reject') => void;
   addProjectAttachment: (projectId: string, attachment: Attachment) => void;
   updateSubtaskProgress: (projectId: string, subtaskId: string, progress: number) => void;
   scheduleClientMeeting: (projectId: string, data: { date: string; note: string }) => void;
@@ -274,7 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const rejectProject: AppState['rejectProject'] = useCallback((projectId, reason) => {
     setProjects((prev) => prev.map((p) =>
-      p.id === projectId ? { ...p, status: 'rejected' as ProjectStatus, rejectionReason: reason } : p
+      p.id === projectId ? { ...p, status: 'rejected' as ProjectStatus, rejectionReason: reason, statusChangedAt: new Date().toISOString() } : p
     ));
     const proj = projects.find((p) => p.id === projectId);
     if (proj) {
@@ -287,7 +288,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateProjectStatus: AppState['updateProjectStatus'] = useCallback((projectId, status) => {
     setProjects((prev) => prev.map((p) =>
-      p.id === projectId ? { ...p, status } : p
+      p.id === projectId
+        ? {
+            ...p,
+            status,
+            statusChangedAt: (status === 'completed' || status === 'rejected')
+              ? new Date().toISOString()
+              : p.statusChangedAt ?? null,
+          }
+        : p
     ));
     const project = projects.find((p) => p.id === projectId);
     if (
@@ -557,6 +566,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let projPatch: Partial<typeof p> = {};
       const mod = p.modifications.find((m) => m.id === modificationId);
       if (mod && decision === 'approved') {
+        // Archive the original version before applying the change
+        const version: ProjectVersion = {
+          id: `ver-${Date.now()}`,
+          title: p.title,
+          description: p.description,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          budget: p.budget,
+          priority: p.priority,
+          category: p.category,
+          subtasks: p.subtasks,
+          capturedAt: new Date().toISOString(),
+          reason: mod.reason,
+        };
+        projPatch.versions = [...(p.versions ?? []), version];
         if (mod.subtaskId && mod.target === 'subtask') {
           subtasks = subtasks.map((st) => {
             if (st.id !== mod.subtaskId) return st;
@@ -632,13 +656,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...p,
             subtasks: p.subtasks.map((st) =>
               st.id === subtaskId
-                ? { ...st, attachments: [...st.attachments, attachment] }
+                ? { ...st, attachments: [...st.attachments, { ...attachment, validationStatus: 'pending' }] }
                 : st
             ),
           }
         : p
     ));
   }, []);
+
+  // ---- Validate a member deliverable (admin / chef de projet)
+  const validateSubtaskAttachment: AppState['validateSubtaskAttachment'] = useCallback((projectId, subtaskId, attachmentId, action) => {
+    if (!currentUser) return;
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            subtasks: p.subtasks.map((st) =>
+              st.id === subtaskId
+                ? {
+                    ...st,
+                    attachments: st.attachments.map((att) =>
+                      att.id === attachmentId
+                        ? { ...att, validationStatus: action === 'approve' ? 'approved' : 'rejected', validatedBy: currentUser.id, validatedAt: new Date().toISOString() }
+                        : att
+                    ),
+                  }
+                : st
+            ),
+          }
+        : p
+    ));
+    const proj = projects.find((p) => p.id === projectId);
+    const st = proj?.subtasks.find((s) => s.id === subtaskId);
+    const att = st?.attachments.find((a) => a.id === attachmentId);
+    if (!proj || !att) return;
+    if (action === 'reject') {
+      const recipients = Array.from(new Set([att.uploadedBy, ...(proj.managerId ? [proj.managerId] : [])].filter(Boolean)));
+      pushNotifications(setNotifications, recipients as string[], {
+        type: 'task_comment',
+        title: 'Livrable refusé',
+        message: `« ${att.fileName} » sur « ${st?.title} » a été refusé. Merci de le reprendre.`,
+        projectId,
+      });
+    } else {
+      const recipients = Array.from(new Set([att.uploadedBy, ...(proj.managerId ? [proj.managerId] : [])].filter(Boolean)));
+      pushNotifications(setNotifications, recipients as string[], {
+        type: 'subtask_reviewed',
+        title: 'Livrable validé',
+        message: `« ${att.fileName} » sur « ${st?.title} » a été validé.`,
+        projectId,
+      });
+    }
+  }, [currentUser, projects, setNotifications]);
 
   // ---- Project attachment (client adds a file forgot during submission)
   const addProjectAttachment: AppState['addProjectAttachment'] = useCallback((projectId, attachment) => {
@@ -766,6 +835,7 @@ submitProject, validateProject, rejectProject, assignManager, updateProjectStatu
     suggestModification, reviewModification,
     addSubtaskComment,
     addSubtaskAttachment,
+    validateSubtaskAttachment,
     addProjectAttachment,
     updateSubtaskProgress,
     scheduleClientMeeting,
@@ -780,6 +850,7 @@ submitProject, validateProject, rejectProject, assignManager, updateProjectStatu
        suggestModification, reviewModification,
        addSubtaskComment,
        addSubtaskAttachment,
+       validateSubtaskAttachment,
        addProjectAttachment,
        updateSubtaskProgress,
        scheduleClientMeeting,

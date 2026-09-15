@@ -210,7 +210,7 @@ function KanbanCard({
   };
 
   return (
-    <Card className="p-3.5 hover:shadow-card-hover hover:border-primary/20 transition-all cursor-pointer group" onClick={() => onOpenDetail(task)}>
+    <Card className="p-3.5 hover:shadow-soft-lg hover:border-primary/30 transition-all cursor-pointer group" onClick={() => onOpenDetail(task)}>
       {/* Header: Title + Priority */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="font-semibold text-sm leading-tight line-clamp-2">{task.title}</p>

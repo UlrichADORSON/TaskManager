@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, lazy, Suspense } from 'react';
+import { useState, useRef, useMemo, lazy, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -43,7 +43,7 @@ import { ProgressBar, ProgressRing } from '@/components/shared/progress';
 import { StatCard } from '@/components/shared/stat-card';
 import {
   getUser, formatDate, formatDateTime, formatCurrency, daysBetween,
-  specialtyMeta, subtaskStatusMeta,
+  specialtyMeta, subtaskStatusMeta, priorityMeta,
 } from '@/lib/status';
 import type { Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User } from '@/types';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,7 @@ export default function ProjectDetailPage() {
     projects, users,     validateProject, rejectProject, assignManager,
     addSubtask, addProjectMember, removeProjectMember, reviewModification,
     suggestModification, approveSubtask, addSubtaskComment, addSubtaskAttachment,
+    validateSubtaskAttachment,
     updateSubtaskStatus, updateSubtaskProgress,
     scheduleClientMeeting,
     addProjectAttachment,
@@ -99,6 +100,31 @@ export default function ProjectDetailPage() {
   const [taskViewMode, setTaskViewMode] = useState<'kanban' | 'list'>('kanban');
   const [detailSubtask, setDetailSubtask] = useState<Subtask | null>(null);
   const projectAttachmentRef = useRef<HTMLInputElement>(null);
+
+  const currentModValue = useMemo(() => {
+    if (!project) return '';
+    if (modReq.target === 'project') {
+      switch (modReq.field) {
+        case 'title': return project.title;
+        case 'description': return project.description || '(vide)';
+        case 'endDate': return formatDate(project.endDate);
+        case 'priority': return priorityMeta[project.priority as Priority]?.label ?? project.priority;
+        case 'budget': return formatCurrency(project.budget);
+        default: return '';
+      }
+    }
+    const st = project.subtasks.find((s) => s.id === modReq.subtaskId);
+    if (st) {
+      switch (modReq.field) {
+        case 'title': return st.title;
+        case 'description': return st.description || '(vide)';
+        case 'dueDate': return formatDate(st.dueDate);
+        case 'priority': return priorityMeta[st.priority as Priority]?.label ?? st.priority;
+        default: return '';
+      }
+    }
+    return '';
+  }, [modReq, project]);
 
   if (!user) return null;
   if (!project) {
@@ -429,86 +455,58 @@ export default function ProjectDetailPage() {
               {(project.platformUsers || project.desiredFeatures || project.necessaryPages || project.plannedFeatures) && (
                 <div className="mt-5 pt-5 border-t border-border space-y-4">
                   <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                    <FileText className="h-4 w-4" /> Détails de la soumission
+                    <FileText className="h-4 w-4" /> Détails du projet
                   </h4>
                   {project.platformUsers && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Utilisateurs de la plateforme</p>
-                      <p className="text-sm">{project.platformUsers}</p>
+                      <ul className="space-y-1">
+                        {project.platformUsers.split(/[\n,]/).map((u) => u.trim()).filter(Boolean).map((u) => (
+                          <li key={u} className="flex items-center gap-2 text-sm">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {project.desiredFeatures && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Fonctionnalités souhaitées</p>
-                      <p className="text-sm">{project.desiredFeatures}</p>
+                      <ul className="space-y-1">
+                        {project.desiredFeatures.split(/[\n,]/).map((u) => u.trim()).filter(Boolean).map((u) => (
+                          <li key={u} className="flex items-center gap-2 text-sm">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {project.necessaryPages && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Pages nécessaires pour le projet</p>
-                      <p className="text-sm">{project.necessaryPages}</p>
+                      <ul className="space-y-1">
+                        {project.necessaryPages.split(/[\n,]/).map((u) => u.trim()).filter(Boolean).map((u) => (
+                          <li key={u} className="flex items-center gap-2 text-sm">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {project.plannedFeatures && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Fonctionnalités prévues</p>
-                      <p className="text-sm">{project.plannedFeatures}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Attachments */}
-              {(project.attachments.length > 0 || isProjectOwner) && (
-                <div className="mt-5 pt-5 border-t border-border">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-                    <Paperclip className="h-4 w-4" /> Pièces jointes ({project.attachments.length})
-                    {!canViewAttachments && (
-                      <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-muted-foreground/60">
-                        <Lock className="h-3 w-3" /> Accès restreint
-                      </span>
-                    )}
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {project.attachments.map((att) => (
-                      <div
-                        key={att.id}
-                        className={`flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 transition-all ${
-                          canViewAttachments
-                            ? 'hover:bg-primary/5 hover:border-primary/30 border border-transparent cursor-pointer'
-                            : 'opacity-60 border border-transparent'
-                        }`}
-                        onClick={() => canViewAttachments && setFileViewer({ url: att.url, fileName: att.fileName, fileType: att.fileType })}
-                      >
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                          {fileIcon(att.fileType)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">{att.fileName}</p>
-                          {canViewAttachments && (
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Eye className="h-2.5 w-2.5" /> Cliquer pour ouvrir
-                            </p>
-                          )}
-                        </div>
-                        {canViewAttachments && <Download className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                        {!canViewAttachments && <Lock className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />}
-                      </div>
-                    ))}
-                  </div>
-
-                  {isProjectOwner && (
-                    <div className="mt-3">
-                      <input ref={projectAttachmentRef} type="file" multiple className="hidden" onChange={handleProjectAttachment} />
-                      <button
-                        type="button"
-                        onClick={() => projectAttachmentRef.current?.click()}
-                        className="w-full rounded-xl border-2 border-dashed border-border py-5 hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-primary"
-                      >
-                        <Upload className="h-5 w-5" />
-                        <span className="text-sm font-medium">Ajouter une pièce jointe</span>
-                        <span className="text-xs">Vous avez oublié un document lors de la soumission ? Envoyez-le ici.</span>
-                      </button>
+                      <ul className="space-y-1">
+                        {project.plannedFeatures.split(/[\n,]/).map((u) => u.trim()).filter(Boolean).map((u) => (
+                          <li key={u} className="flex items-center gap-2 text-sm">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
@@ -525,6 +523,21 @@ export default function ProjectDetailPage() {
                     </div>
                   </button>
                   <div className="space-y-2">
+                    <div className="flex items-center gap-2.5 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <a href={`mailto:${client.email}`} className="hover:text-primary transition-colors">{client.email}</a>
+                    </div>
+                    {client.whatsapp && (
+                      <a
+                        href={`https://wa.me/${client.whatsapp.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 text-sm hover:text-[#25D366] transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        <span>{client.whatsapp}</span>
+                      </a>
+                    )}
                     {client.company && (
                       <div className="flex items-center gap-2.5 text-sm">
                         <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -691,6 +704,68 @@ export default function ProjectDetailPage() {
         {/* ---- Tasks tab (with comments) ---- */}
         <TabsContent value="tasks">
           <div>
+            {/* Project attachment delivery */}
+            {(project.attachments.length > 0 || isProjectOwner) && (
+              <div className="mb-5 rounded-xl border border-border bg-card">
+                <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Livraison des pièces jointes</h3>
+                    <span className="text-xs text-muted-foreground">({project.attachments.length})</span>
+                  </div>
+                  {!canViewAttachments && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60">
+                      <Lock className="h-3 w-3" /> Accès restreint
+                    </span>
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {project.attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 transition-all ${
+                          canViewAttachments
+                            ? 'hover:bg-primary/5 hover:border-primary/30 border border-transparent cursor-pointer'
+                            : 'opacity-60 border border-transparent'
+                        }`}
+                        onClick={() => canViewAttachments && setFileViewer({ url: att.url, fileName: att.fileName, fileType: att.fileType })}
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                          {fileIcon(att.fileType)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{att.fileName}</p>
+                          {canViewAttachments && (
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Eye className="h-2.5 w-2.5" /> Cliquer pour ouvrir
+                            </p>
+                          )}
+                        </div>
+                        {canViewAttachments && <Download className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                        {!canViewAttachments && <Lock className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+
+                  {isProjectOwner && (
+                    <div className="mt-3">
+                      <input ref={projectAttachmentRef} type="file" multiple className="hidden" onChange={handleProjectAttachment} />
+                      <button
+                        type="button"
+                        onClick={() => projectAttachmentRef.current?.click()}
+                        className="w-full rounded-xl border-2 border-dashed border-border py-5 hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-primary"
+                      >
+                        <Upload className="h-5 w-5" />
+                        <span className="text-sm font-medium">Ajouter un document</span>
+                        <span className="text-xs">Vous avez oublié un document lors de la soumission ? Envoyez-le ici.</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 {project.subtasks.length > 0 && (
@@ -742,7 +817,7 @@ export default function ProjectDetailPage() {
             {project.subtasks.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground">
                 <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Aucune sous-tâche définie. Le chef de projet ou l'admin doit cadrer les tâches.</p>
+                <p>Aucune sous-tâche définie. Le chef de projet ou l&apos;admin doit cadrer les tâches.</p>
               </Card>
             ) : taskViewMode === 'kanban' ? (
               <Suspense fallback={<div className="h-64 flex items-center justify-center text-muted-foreground text-sm">Chargement du Kanban...</div>}>
@@ -966,6 +1041,34 @@ export default function ProjectDetailPage() {
         {/* ---- Modifications tab ---- */}
         <TabsContent value="modifications">
           <div>
+            <div className="mb-5 rounded-xl border border-border bg-muted/20 overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                    <Edit3 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Demandes de modification</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+                      Besoin d’un ajustement sur le projet (titre, description, délai, priorité, budget…) ou sur une sous-tâche ?
+                      Faites une demande : l’équipe l’examinera puis l’approuvera ou la rejettera. Vous serez notifié(e) dès traitement.
+                    </p>
+                  </div>
+                </div>
+                {project.status !== 'pending' && project.status !== 'rejected' && (
+                  <Button size="sm" onClick={() => setModReqOpen(true)} className="flex-shrink-0">
+                    <Plus className="h-4 w-4 mr-2" /> Nouvelle demande
+                  </Button>
+                )}
+              </div>
+              <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-background/50">
+                <span className="font-medium text-foreground">Comprendre les statuts :</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> En attente — pas encore examinée</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Approuvée — le changement est appliqué</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Rejetée — un motif est indiqué</span>
+              </div>
+            </div>
+
             {project.modifications.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground">
                 <Edit3 className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -1262,34 +1365,34 @@ export default function ProjectDetailPage() {
             {user.role !== 'admin' && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
-                <p>Votre demande sera examinée par un administrateur. Vous recevrez une notification dès qu’elle sera traitée.</p>
+                <p>Votre demande sera examinée par l’équipe (chef de projet ou administrateur). Vous recevrez une notification dès qu’elle sera traitée.</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setModReq({ ...modReq, target: 'project', subtaskId: '' })} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left', modReq.target === 'project' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
-                <FolderKanban className="h-4 w-4 mb-1.5" />
-                Le projet
-              </button>
-              <button type="button" onClick={() => setModReq({ ...modReq, target: 'subtask' })} disabled={project.subtasks.length === 0} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed', modReq.target === 'subtask' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
-                <ListTodo className="h-4 w-4 mb-1.5" />
-                Une sous-tâche
-              </button>
-            </div>
-            {modReq.target === 'subtask' && (
-              <div>
-                <Label>Sous-tâche à modifier</Label>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">1. Choisissez ce que vous souhaitez modifier</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setModReq({ ...modReq, target: 'project', subtaskId: '' })} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left', modReq.target === 'project' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
+                  <FolderKanban className="h-4 w-4 mb-1.5" />
+                  Le projet
+                </button>
+                <button type="button" onClick={() => setModReq({ ...modReq, target: 'subtask' })} disabled={project.subtasks.length === 0} className={cn('p-3 rounded-lg border text-sm font-medium transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed', modReq.target === 'subtask' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-border/80 text-muted-foreground')}>
+                  <ListTodo className="h-4 w-4 mb-1.5" />
+                  Une sous-tâche
+                </button>
+              </div>
+              {modReq.target === 'subtask' && (
                 <Select value={modReq.subtaskId} onValueChange={(v) => setModReq({ ...modReq, subtaskId: v, field: 'title' })}>
-                  <SelectTrigger><SelectValue placeholder="Choisir une sous-tâche..." /></SelectTrigger>
+                  <SelectTrigger className="mt-2"><SelectValue placeholder="Choisir une sous-tâche..." /></SelectTrigger>
                   <SelectContent>
                     {project.subtasks.map((st) => (
                       <SelectItem key={st.id} value={st.id}>{st.title}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              )}
+            </div>
             <div>
-              <Label>Champ à modifier</Label>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">2. Indiquez le champ à modifier</p>
               <Select value={modReq.field} onValueChange={(v) => setModReq({ ...modReq, field: v, newValue: '' })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1298,9 +1401,17 @@ export default function ProjectDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {currentModValue && (
+                <div className="mt-2 p-3 rounded-lg bg-muted/40 border border-border/60">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Valeur actuelle du champ « {fieldLabels[modReq.field] ?? (modReq.target === 'project' ? projectFields : subtaskFields).find((f) => f.value === modReq.field)?.label ?? modReq.field} »
+                  </p>
+                  <p className="text-sm">{currentModValue}</p>
+                </div>
+              )}
             </div>
             <div>
-              <Label>Nouvelle valeur</Label>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">3. Proposez la nouvelle valeur</p>
               {(modReq.field === 'priority') ? (
                 <Select value={modReq.newValue} onValueChange={(v) => setModReq({ ...modReq, newValue: v })}>
                   <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
@@ -1426,6 +1537,7 @@ export default function ProjectDetailPage() {
           onProgressChange={(subtaskId, progress) => updateSubtaskProgress(project.id, subtaskId, progress)}
           onAddComment={(subtaskId, content) => addSubtaskComment(project.id, subtaskId, content)}
           onAddDeliverable={(subtaskId, attachment) => addSubtaskAttachment(project.id, subtaskId, attachment)}
+          onValidateAttachment={(subtaskId, attachmentId, action) => validateSubtaskAttachment(project.id, subtaskId, attachmentId, action)}
           onModificationRequest={handleModificationRequestFromDetail}
         />
       </Suspense>

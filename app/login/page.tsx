@@ -78,59 +78,73 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative">
-      {/* Decorative blurred orbs */}
-      <div className="absolute top-1/4 -left-32 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 h-64 w-64 rounded-full bg-accent/5 blur-3xl pointer-events-none" />
-
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-6 lg:px-12 h-16 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary">
-            <Layers className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight">ProFlow</span>
+    <div className="min-h-screen flex bg-background selection:bg-primary/10 overflow-hidden">
+      {/* Left pane - Image & branding (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 flex-col justify-between p-10 xl:p-12">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=2070&auto=format&fit=crop"
+            alt="Mountain lake landscape"
+            className="w-full h-full object-cover opacity-85"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
         </div>
-        {mounted && (
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="p-2.5 rounded-lg hover:bg-muted transition-colors"
-            title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-          >
-            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
-        )}
-      </header>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-10">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full max-w-xl"
-        >
-          <div className="text-center mb-8">
-            <h1 className="font-display text-3xl font-bold tracking-tight mb-2">
-              Connectez-vous à <span className="text-primary">ProFlow</span>
-            </h1>
-            <p className="text-muted-foreground">
-              Accédez à votre espace de gestion de projets selon votre rôle.
-            </p>
+        <div className="relative z-10 flex items-center gap-3 text-white">
+          <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary shadow-soft-lg">
+            <Layers className="h-5 w-5 text-white" />
           </div>
+          <span className="font-display text-2xl font-bold tracking-tight">TaskFlow</span>
+        </div>
 
-          <div className="rounded-2xl border border-border bg-card p-6 lg:p-8 shadow-sm">
+        <div className="relative z-10 max-w-md">
+          <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-white mb-5 leading-tight">
+            Organisez vos idées, réalisez vos projets.
+          </h1>
+          <p className="text-lg text-white/80">
+            Une plateforme moderne et intuitive pour gérer vos tâches efficacement, conçue pour les équipes exigeantes.
+          </p>
+        </div>
+      </div>
+
+      {/* Right pane - Login form */}
+      <div className="flex-1 flex flex-col relative max-h-screen overflow-y-auto">
+        <header className="absolute top-0 right-0 p-4 flex justify-end w-full">
+          {mounted && (
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+          )}
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
+            className="w-full max-w-md"
+          >
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold tracking-tight mb-1.5">Se connecter</h2>
+              <p className="text-sm text-muted-foreground">Accédez à votre espace de travail.</p>
+            </div>
+
             {/* Login form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="email">Adresse email</Label>
+                <Label htmlFor="email" className="text-xs">Email</Label>
                 <div className="relative mt-1.5">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     autoComplete="email"
-                    placeholder="vous@exemple.fr"
-                    className="pl-10"
+                    placeholder="votre@email.com"
+                    className="pl-9 h-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -138,7 +152,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password" className="text-xs">Mot de passe</Label>
                 <div className="relative mt-1.5">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -146,7 +160,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className="pl-10 pr-10"
+                    className="pl-9 pr-9 h-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -154,35 +168,45 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    title={showPassword ? 'Masquer' : 'Afficher'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <div className="flex justify-between items-center mt-2.5">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input type="checkbox" className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5" defaultChecked />
+                    <span>Se souvenir de moi</span>
+                  </label>
+                  <a href="#" className="text-xs font-medium text-primary hover:underline">Mot de passe oublié ?</a>
+                </div>
               </div>
 
               {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2.5">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 animate-in fade-in zoom-in-95 duration-200">
                   {error}
                 </div>
               )}
 
-              <Button type="submit" className="w-full gap-2" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Se connecter
+              <Button type="submit" className="w-full h-10 shadow-soft-lg group relative overflow-hidden" disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Se connecter'}
+                {!loading && <span className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />}
               </Button>
             </form>
 
-            <div className="flex items-center gap-3 my-6">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                Comptes de démonstration
-              </span>
-              <div className="h-px flex-1 bg-border" />
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase">
+                <span className="bg-background px-3 text-muted-foreground font-medium tracking-wider">
+                  Comptes de démonstration
+                </span>
+              </div>
             </div>
 
             {/* Demo accounts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
               {demoAccounts.map((acc) => {
                 const demoUser = users.find((u) => u.email.toLowerCase() === acc.email.toLowerCase());
                 return (
@@ -191,36 +215,33 @@ export default function LoginPage() {
                     type="button"
                     disabled={demoLoading !== null}
                     onClick={() => handleDemoLogin(acc)}
-                    className="group text-left flex items-center gap-3 rounded-xl border border-border bg-background/60 hover:border-primary/50 hover:bg-primary/5 transition-colors p-3 disabled:opacity-60"
+                    className="group text-left flex items-center gap-2.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 hover:shadow-soft-lg transition-all duration-300 p-2.5 disabled:opacity-60"
                   >
                     <div className="flex-shrink-0">
-                      <UserAvatar user={demoUser} size="md" />
+                      <UserAvatar user={demoUser} size="sm" className="shadow-sm" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">
+                      <p className="text-[13px] font-semibold truncate group-hover:text-primary transition-colors leading-tight">
                         {demoLoading === acc.role ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                          <Loader2 className="h-3 w-3 animate-spin inline" />
                         ) : (
                           demoUser?.name ?? acc.email
                         )}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="mt-0.5">
                         <RoleBadge role={acc.role} />
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                        {acc.email} · {acc.password}
-                      </p>
                     </div>
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-5">
-            Prototype frontend — les comptes et données sont fictifs.
-          </p>
-        </motion.div>
+            <p className="text-center text-[11px] text-muted-foreground mt-6">
+              Pas encore de compte ? <a href="#" className="text-primary hover:underline font-medium">Créer un compte</a>
+            </p>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { ViewToggle, type ViewMode } from '@/components/shared/view-toggle';
 import { ProjectListView } from '@/components/shared/project-list-view';
 import { ProjectKanbanBoard } from '@/components/shared/project-kanban-board';
 import { projectStatusMeta } from '@/lib/status';
+import { isProjectArchived } from '@/lib/status';
 import { motion } from 'framer-motion';
 import { FolderKanban } from 'lucide-react';
 
@@ -26,6 +27,8 @@ export default function ProjectsPage() {
     if (user.role === 'client') list = list.filter((p) => p.clientId === user.id);
     else if (user.role === 'chef_de_projet') list = list.filter((p) => p.managerId === user.id);
     else if (user.role === 'membre') list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id));
+    // Exclude archived projects (terminal status older than 24h)
+    list = list.filter((p) => !isProjectArchived(p));
     if (statusFilter !== 'all') list = list.filter((p) => p.status === statusFilter);
     if (priorityFilter !== 'all') list = list.filter((p) => p.priority === priorityFilter);
     if (search) list = list.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()));

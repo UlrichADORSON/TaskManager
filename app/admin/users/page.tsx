@@ -76,7 +76,7 @@ export default function AdminUsersPage() {
           <div>
             <h2 className="font-display text-2xl font-bold tracking-tight">Utilisateurs</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Clients et membres de l'équipe — {visibleUsers.length} affiché{visibleUsers.length > 1 ? 's' : ''}
+              Clients et membres de l&apos;équipe — {visibleUsers.length} affiché{visibleUsers.length > 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">

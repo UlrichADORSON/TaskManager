@@ -38,33 +38,27 @@ export function StatCard({ label, value, icon: Icon, trend, color = 'text-primar
       <Component
         onClick={onClick}
         className={cn(
-          'relative w-full rounded-xl p-4 text-left bg-card transition-all duration-300 border',
-          meta.bg,
-          onClick && 'hover:shadow-card-hover hover:-translate-y-1 cursor-pointer'
+          'group relative w-full rounded-xl p-5 text-left bg-card transition-all duration-300 border border-border',
+          onClick && 'hover:shadow-soft-lg hover:border-border/80 cursor-pointer'
         )}
       >
-        <div className="relative flex items-center justify-between">
-          <div className={cn('inline-flex items-center justify-center h-9 w-9 rounded-lg flex-shrink-0', meta.chip)}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className={cn('inline-flex items-center justify-center h-8 w-8 rounded-md flex-shrink-0', meta.chip)}>
             <Icon className="h-4 w-4" />
           </div>
-          {onClick && (
-            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-muted/70 text-muted-foreground flex-shrink-0">
-              <TrendIcon className={cn('h-3 w-3', trend && !trend.positive && 'rotate-90')} />
-            </span>
-          )}
         </div>
 
-        <div className="relative mt-3">
+        <div className="flex items-baseline gap-2">
+          <p className="text-2xl font-bold font-display tracking-tight text-foreground">{value}</p>
           {trend && (
             <span className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-              trend.positive ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+              'inline-flex items-center gap-0.5 text-xs font-medium',
+              trend.positive ? 'text-success' : 'text-destructive'
             )}>
               <TrendIcon className="h-3 w-3" /> {trend.value}
             </span>
           )}
-          <p className="text-xl font-bold font-display tracking-tight mt-1 text-foreground">{value}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
         </div>
       </Component>
     </motion.div>

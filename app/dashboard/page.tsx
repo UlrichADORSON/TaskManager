@@ -7,12 +7,14 @@ import {
   FolderKanban, Clock, CheckCircle2, Users, ShieldCheck, ListChecks,
   TrendingUp, FileText, CheckSquare, Briefcase, Layers,
 } from 'lucide-react';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar,
 } from 'recharts';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { isProjectArchived } from '@/lib/status';
 import { AppShell } from '@/components/shared/app-shell';
 import { StatCard } from '@/components/shared/stat-card';
 import { FilterBar } from '@/components/shared/filter-bar';
@@ -42,6 +44,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('kanban');
 
@@ -52,14 +55,29 @@ export default function DashboardPage() {
       list = list.filter((p) => p.clientId === user.id);
     } else if (user.role === 'chef_de_projet') {
       list = list.filter((p) => p.managerId === user.id);
-    } else if (user.role === 'membre') {
+    } else     if (user.role === 'membre') {
       list = list.filter((p) => p.subtasks.some((st) => st.assignedToId === user.id) || p.members.some((m) => m.userId === user.id));
+    }
+    // Exclude archived projects (terminal status older than 24h)
+    list = list.filter((p) => !isProjectArchived(p));
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      let refStart: Date;
+      let refEnd: Date;
+      if (dateFilter === 'today') { refStart = startOfDay(now); refEnd = endOfDay(now); }
+      else if (dateFilter === 'this_week') { refStart = startOfWeek(now, { weekStartsOn: 1 }); refEnd = endOfWeek(now, { weekStartsOn: 1 }); }
+      else { refStart = startOfMonth(now); refEnd = endOfMonth(now); }
+      list = list.filter((p) => {
+        const s = parseISO(p.startDate);
+        const e = parseISO(p.endDate);
+        return s <= refEnd && e >= refStart;
+      });
     }
     if (statusFilter !== 'all') list = list.filter((p) => p.status === statusFilter);
     if (priorityFilter !== 'all') list = list.filter((p) => p.priority === priorityFilter);
     if (search) list = list.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()));
     return list;
-  }, [user, projects, statusFilter, priorityFilter, search]);
+  }, [user, projects, statusFilter, priorityFilter, dateFilter, search]);
 
   // Projets soumis en attente de validation (les sous-tâches en révision se gèrent dans le projet)
   const toValidateList = useMemo(
@@ -143,22 +161,35 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">{greeting}</h2>
-          <p className="text-muted-foreground mt-1">
-            {role === 'admin' && 'Vue d\'ensemble de tous les projets et de l\'équipe'}
-            {role === 'chef_de_projet' && 'Suivez et gérez vos projets assignés'}
-            {role === 'membre' && 'Vos tâches et votre travail à accomplir'}
-            {role === 'client' && 'Suivez l\'avancement de vos projets'}
-          </p>
+      {/* Header Banner */}
+      <div className="relative mb-8 rounded-2xl overflow-hidden bg-slate-900 shadow-md">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=2070&auto=format&fit=crop"
+            alt="Mountain landscape"
+            className="w-full h-full object-cover opacity-60"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/50 to-transparent" />
         </div>
-        {role === 'client' && (
-          <Button size="sm" onClick={() => router.push('/submit')}>
-            <FileText className="h-4 w-4 mr-2" /> Soumettre un projet
-          </Button>
-        )}
+        
+        <div className="relative z-10 p-8 sm:p-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6">
+          <div className="text-white">
+            <h2 className="font-display text-3xl font-bold tracking-tight mb-2">
+              {greeting}
+            </h2>
+            <p className="text-white/80 max-w-lg">
+              {role === 'admin' && 'Vue d\'ensemble de tous les projets et de l\'équipe.'}
+              {role === 'chef_de_projet' && 'Suivez et gérez vos projets assignés.'}
+              {role === 'membre' && 'Voici un aperçu de votre activité aujourd\'hui.'}
+              {role === 'client' && 'Suivez l\'avancement de vos projets.'}
+            </p>
+          </div>
+          {role === 'client' && (
+            <Button size="lg" onClick={() => router.push('/submit')} className="shadow-soft-lg hover:scale-105 transition-transform">
+              <FileText className="h-4 w-4 mr-2" /> Soumettre un projet
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -321,6 +352,15 @@ export default function DashboardPage() {
           onSearchChange={setSearch}
           searchPlaceholder="Rechercher un projet..."
           filters={[
+            {
+              key: 'date', value: dateFilter, onChange: setDateFilter,
+              options: [
+                { value: 'all', label: 'Toutes les dates' },
+                { value: 'today', label: "Aujourd'hui" },
+                { value: 'this_week', label: 'Cette semaine' },
+                { value: 'this_month', label: 'Ce mois-ci' },
+              ],
+            },
             {
               key: 'status', value: statusFilter, onChange: setStatusFilter,
               options: [

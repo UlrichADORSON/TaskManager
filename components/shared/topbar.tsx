@@ -88,14 +88,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Search — pill large */}
       <div className="flex-1 max-w-xl" ref={searchRef}>
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Rechercher un projet..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
             onFocus={() => setSearchOpen(true)}
-            className="w-full h-10 pl-11 pr-4 text-sm rounded-full bg-muted/70 border border-transparent focus:border-primary/40 focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground"
+            className="w-full h-9 pl-9 pr-4 text-sm rounded-lg bg-muted/50 border border-transparent focus:border-border focus:bg-background focus:ring-4 focus:ring-primary/5 transition-all outline-none placeholder:text-muted-foreground shadow-sm"
           />
           <AnimatePresence>
             {searchOpen && searchResults.length > 0 && (
@@ -103,20 +103,20 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute top-full mt-2 w-full rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden"
+                className="absolute top-full mt-2 w-full rounded-lg border border-border bg-popover shadow-soft-lg overflow-hidden"
               >
                 {searchResults.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => { router.push(`/projects/${p.id}`); setSearchOpen(false); setSearchQuery(''); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted transition-colors text-left"
                   >
                     {p.logoUrl ? (
-                      <div className="h-8 w-8 rounded-lg border border-border overflow-hidden bg-muted/20 flex items-center justify-center flex-shrink-0">
+                      <div className="h-8 w-8 rounded-md border border-border overflow-hidden bg-muted/20 flex items-center justify-center flex-shrink-0">
                         <img src={p.logoUrl} alt="Logo" className="h-full w-full object-contain" />
                       </div>
                     ) : (
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-bold text-primary">{p.title[0]}</span>
                       </div>
                     )}
@@ -133,7 +133,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute top-full mt-2 w-full rounded-2xl border border-border bg-popover shadow-card-hover px-4 py-6 text-center text-sm text-muted-foreground"
+                className="absolute top-full mt-2 w-full rounded-lg border border-border bg-popover shadow-soft-lg px-4 py-6 text-center text-sm text-muted-foreground"
               >
                 Aucun projet trouvé pour « {searchQuery} »
               </motion.div>
@@ -175,7 +175,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden z-50"
+                className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-lg border border-border bg-popover shadow-soft-lg overflow-hidden z-50"
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="font-semibold text-sm">Notifications</h3>
@@ -237,7 +237,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-popover shadow-card-hover overflow-hidden z-50"
+                className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-border bg-popover shadow-soft-lg overflow-hidden z-50"
               >
                 <div className="px-4 py-3 border-b border-border">
                   <p className="text-sm font-semibold">{currentUser.name}</p>
