@@ -283,7 +283,7 @@ export default function EmployeesPage() {
                             )}
                           </div>
                         </div>
-                        <span className="relative flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-white/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 flex-shrink-0 transition-all">
+                        <span className="relative flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-muted/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 flex-shrink-0 transition-all">
                           <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                         </span>
                       </div>

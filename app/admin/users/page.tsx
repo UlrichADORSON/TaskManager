@@ -97,7 +97,7 @@ export default function AdminUsersPage() {
               className={cn(
                 'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98]',
                 active
-                  ? 'border-primary bg-primary text-white shadow-sm shadow-primary/25'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/25'
                   : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
               )}
             >

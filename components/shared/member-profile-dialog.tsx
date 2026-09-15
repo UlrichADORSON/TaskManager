@@ -202,7 +202,7 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
               <div className="relative px-8 py-4">
                 <div className="grid grid-cols-4 gap-2">
                   {stats.map((s) => (
-                    <div key={s.label} className="rounded-[20px] bg-[#F7F7F6] py-4 px-2 text-center min-w-0">
+                    <div key={s.label} className="rounded-[20px] bg-muted py-4 px-2 text-center min-w-0">
                       <p className="font-display text-xl font-bold truncate">{s.value}</p>
                       <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{s.label}</p>
                     </div>
@@ -275,7 +275,7 @@ export function MemberProfileDialog({ user, open, onOpenChange, canEdit = false 
             {/* Mode édition */}
             {editing && (
               <div className="relative px-8 pb-8">
-                <div className="rounded-[24px] bg-[#F7F7F6] p-5 space-y-4">
+                <div className="rounded-[24px] bg-muted p-5 space-y-4">
                   <div className="flex items-start gap-2 -mt-1">
                     <KeyRound className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">

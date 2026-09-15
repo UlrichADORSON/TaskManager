@@ -994,7 +994,7 @@ export default function ProjectDetailPage() {
                             </div>
                           </div>
                           <div className="relative flex flex-col items-end gap-2 flex-shrink-0">
-                            <span className="flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-white/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 transition-all">
+                            <span className="flex items-center justify-center h-9 w-9 rounded-full border border-border/70 bg-muted/60 text-muted-foreground group-hover:text-primary group-hover:border-primary/40 group-hover:bg-primary/5 transition-all">
                               <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                             </span>
                             {removable && (
@@ -1571,7 +1571,7 @@ export default function ProjectDetailPage() {
                   <a
                     href={fileViewer.url}
                     download={fileViewer.fileName}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
                   >
                     <Download className="h-3.5 w-3.5" /> Télécharger
                   </a>
