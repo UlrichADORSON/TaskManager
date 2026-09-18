@@ -1,0 +1,20 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/UlrichADORSON/TaskManager.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "final"]
+	remote = origin
+	merge = refs/heads/final
+	vscode-merge-base = origin/final
+[branch "auth"]
+	vscode-merge-base = origin/final
+[branch "develop"]
+	vscode-merge-base = origin/final
+[branch "feature/auth"]
+	vscode-merge-base = origin/final
