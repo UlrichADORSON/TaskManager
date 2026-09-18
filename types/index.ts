@@ -18,6 +18,8 @@ export type SubtaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
 export type ModificationStatus = 'pending' | 'pending_client' | 'approved' | 'rejected';
 
+export type TaskRequestStatus = 'pending' | 'approved' | 'rejected';
+
 export type ModificationTarget = 'subtask' | 'project';
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
@@ -112,6 +114,21 @@ export interface ModificationRequest {
   clientReview?: { userId: string; note: string; at: string } | null; // client validation (final stage)
 }
 
+// ------------------------------------ Client task request (validated by the admin)
+export interface TaskRequest {
+  id: string;
+  projectId: string;
+  clientId: string;
+  title: string;
+  description: string;
+  priority: Priority;
+  status: TaskRequestStatus;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  reviewNote: string;
+  createdAt: string;
+}
+
 // ------------------------------------ Progress timeline point (for the curve chart)
 export interface ProgressPoint {
   date: string;          // ISO date
@@ -173,6 +190,7 @@ export interface Project {
   progressTimeline: ProgressPoint[];
   calendarEvents: CalendarEvent[];
   modifications: ModificationRequest[];
+  taskRequests: TaskRequest[];
   // Submission detail fields
   platformUsers?: string;      // utilisateurs de la plateforme
   desiredFeatures?: string;    // fonctionnalités souhaitées
@@ -194,7 +212,8 @@ export interface AppNotification {
       | 'subtask_assigned' | 'delay_detected'
       | 'project_completed' | 'modification_requested' | 'modification_reviewed'
       | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event'
-      | 'task_comment' | 'project_attachment';
+      | 'task_comment' | 'project_attachment'
+      | 'task_requested' | 'task_request_approved' | 'task_request_rejected';
   title: string;
   message: string;
   projectId?: string;

@@ -504,7 +504,7 @@ export function SubtaskDetailDialog({
               </button>
             </div>
             <div className="p-4">
-              {viewingFile.fileType.startsWith('image/') ? (
+              {viewingFile.fileType.startsWith('image/') && viewingFile.fileType !== 'image/svg+xml' ? (
                 <div>
                   <div className="flex justify-center mb-3">
                     <a
@@ -521,9 +521,13 @@ export function SubtaskDetailDialog({
                 <div className="text-center py-8">
                   <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
                   <p className="text-sm text-muted-foreground mb-3">{viewingFile.fileName}</p>
-                  <Button onClick={() => window.open(viewingFile.url, '_blank')}>
-                    <Download className="h-4 w-4 mr-2" /> Télécharger
-                  </Button>
+                  <a
+                    href={viewingFile.url}
+                    download={viewingFile.fileName}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-4 w-4" /> Télécharger
+                  </a>
                 </div>
               )}
             </div>

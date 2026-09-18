@@ -16,6 +16,7 @@ import {
   Check, Trash2, Download, Eye, Lock, Paperclip, Send, ListTodo, ShieldCheck,
   Phone, Mail, Building2, User as UserIcon, CalendarClock, ArrowUpRight,
   LayoutGrid, List, Upload,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -45,7 +46,7 @@ import {
   getUser, formatDate, formatDateTime, formatCurrency, daysBetween,
   specialtyMeta, subtaskStatusMeta, priorityMeta,
 } from '@/lib/status';
-import type { Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User } from '@/types';
+import type { Priority, ModificationRequest, Role, Subtask, MemberSpecialty, User, TaskRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -54,6 +55,7 @@ export default function ProjectDetailPage() {
   const {
     projects, users,     validateProject, rejectProject, assignManager, revertProjectValidation,
     addSubtask, addProjectMember, removeProjectMember, reviewModification,
+    requestTask, reviewTaskRequest,
     suggestModification, approveSubtask, addSubtaskComment, addSubtaskAttachment,
     validateSubtaskAttachment,
     updateSubtaskStatus, updateSubtaskProgress,
@@ -86,6 +88,10 @@ export default function ProjectDetailPage() {
   });
   const [reviewDialog, setReviewDialog] = useState<{ mod: ModificationRequest; decision: 'approved' | 'rejected' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [taskReqOpen, setTaskReqOpen] = useState(false);
+  const [taskReqForm, setTaskReqForm] = useState({ title: '', description: '', priority: 'medium' as Priority });
+  const [taskReviewDialog, setTaskReviewDialog] = useState<{ req: TaskRequest; decision: 'approved' | 'rejected' } | null>(null);
+  const [taskReviewNote, setTaskReviewNote] = useState('');
   const [fileViewer, setFileViewer] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
   const [modReqOpen, setModReqOpen] = useState(false);
   const [modReq, setModReq] = useState({
@@ -166,6 +172,27 @@ export default function ProjectDetailPage() {
       setRejectOpen(false);
       setRejectReason('');
     }
+  };
+
+  const handleRequestTask = () => {
+    if (!taskReqForm.title.trim()) return;
+    requestTask(project.id, { title: taskReqForm.title, description: taskReqForm.description, priority: taskReqForm.priority });
+    setTaskReqOpen(false);
+    setTaskReqForm({ title: '', description: '', priority: 'medium' });
+    toast({ title: 'Demande envoyée', description: 'Votre demande de tâche sera examinée par l\'administrateur.' });
+  };
+
+  const handleReviewTaskRequest = () => {
+    if (!taskReviewDialog) return;
+    reviewTaskRequest(project.id, taskReviewDialog.req.id, taskReviewDialog.decision, taskReviewNote.trim());
+    setTaskReviewDialog(null);
+    setTaskReviewNote('');
+    toast({
+      title: taskReviewDialog.decision === 'approved' ? 'Demande approuvée' : 'Demande refusée',
+      description: taskReviewDialog.decision === 'approved'
+        ? 'La tâche a été créée dans le projet et le client en a été notifié.'
+        : 'Le client a été notifié du refus.',
+    });
   };
 
   const handleCreateSubtask = () => {
@@ -727,6 +754,63 @@ export default function ProjectDetailPage() {
         {/* ---- Tasks tab (with comments) ---- */}
         <TabsContent value="tasks">
           <div>
+            {/* Client task requests (validated by the admin) */}
+            {(isProjectOwner || user.role === 'admin') && (
+              <div className="mb-5 rounded-xl border border-border bg-card">
+                <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Demandes de tâche</h3>
+                    <span className="text-xs text-muted-foreground">({project.taskRequests.length})</span>
+                  </div>
+                  {isProjectOwner && (
+                    <Button size="sm" onClick={() => setTaskReqOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1.5" /> Demander une tâche
+                    </Button>
+                  )}
+                </div>
+                {project.taskRequests.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Aucune demande de tâche pour le moment.</p>
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-2">
+                    {project.taskRequests.map((req) => (
+                      <div key={req.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium">{req.title}</p>
+                            <PriorityBadge priority={req.priority} />
+                            <TaskRequestStatusBadge status={req.status} />
+                          </div>
+                          {req.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{req.description}</p>
+                          )}
+                          <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" /> {formatDate(req.createdAt)}
+                            {(req.status === 'approved' || req.status === 'rejected') && req.reviewNote && (
+                              <span> · Note admin : « {req.reviewNote} »</span>
+                            )}
+                          </p>
+                        </div>
+                        {user.role === 'admin' && req.status === 'pending' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button size="sm" variant="outline" onClick={() => { setTaskReviewDialog({ req, decision: 'rejected' }); setTaskReviewNote(''); }}>
+                              <XCircle className="h-3.5 w-3.5 mr-1.5" /> Refuser
+                            </Button>
+                            <Button size="sm" onClick={() => { setTaskReviewDialog({ req, decision: 'approved' }); setTaskReviewNote(''); }}>
+                              <Check className="h-3.5 w-3.5 mr-1.5" /> Approuver
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Project attachment delivery */}
             {(project.attachments.length > 0 || isProjectOwner) && (
               <div className="mb-5 rounded-xl border border-border bg-card">
@@ -1387,6 +1471,91 @@ export default function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Task request dialog (client) */}
+      <Dialog open={taskReqOpen} onOpenChange={setTaskReqOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-primary" /> Demander une tâche
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground">
+              <Info className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
+              <p>Votre demande sera examinée par l’administrateur. Si elle est acceptée, elle deviendra une sous-tâche du projet.</p>
+            </div>
+            <div>
+              <Label htmlFor="tr-title">Titre de la tâche *</Label>
+              <Input id="tr-title" value={taskReqForm.title} onChange={(e) => setTaskReqForm((f) => ({ ...f, title: e.target.value }))} placeholder="ex. Ajouter une page FAQ" />
+            </div>
+            <div>
+              <Label htmlFor="tr-desc">Description</Label>
+              <Textarea id="tr-desc" value={taskReqForm.description} onChange={(e) => setTaskReqForm((f) => ({ ...f, description: e.target.value }))} placeholder="Décrivez le besoin..." rows={3} />
+            </div>
+            <div>
+              <Label>Priorité</Label>
+              <Select value={taskReqForm.priority} onValueChange={(v) => setTaskReqForm((f) => ({ ...f, priority: v as Priority }))}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Basse</SelectItem>
+                  <SelectItem value="medium">Moyenne</SelectItem>
+                  <SelectItem value="high">Haute</SelectItem>
+                  <SelectItem value="urgent">Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTaskReqOpen(false)}>Annuler</Button>
+            <Button onClick={handleRequestTask} disabled={!taskReqForm.title.trim()}>
+              <Send className="h-4 w-4 mr-2" /> Envoyer la demande
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review task request dialog (admin) */}
+      <Dialog open={!!taskReviewDialog} onOpenChange={(open) => { if (!open) setTaskReviewDialog(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {taskReviewDialog?.decision === 'approved' ? (
+                <><CheckCircle2 className="h-5 w-5 text-success" /> Approuver la demande</>
+              ) : (
+                <><XCircle className="h-5 w-5 text-destructive" /> Refuser la demande</>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {taskReviewDialog && (
+              <div className="p-3 rounded-lg bg-muted/30 space-y-1">
+                <p className="text-sm font-medium">{taskReviewDialog.req.title}</p>
+                {taskReviewDialog.req.description && <p className="text-xs text-muted-foreground">{taskReviewDialog.req.description}</p>}
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <PriorityBadge priority={taskReviewDialog.req.priority} /> demandée par le client
+                </p>
+              </div>
+            )}
+            {taskReviewDialog?.decision === 'approved' && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-muted-foreground">
+                <Info className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
+                <p>Une sous-tâche sera créée automatiquement dans le projet et le client en sera notifié.</p>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="task-review-note">Note (facultatif)</Label>
+              <Textarea id="task-review-note" value={taskReviewNote} onChange={(e) => setTaskReviewNote(e.target.value)} placeholder="Motif / commentaire transmis au client..." rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTaskReviewDialog(null)}>Annuler</Button>
+            <Button onClick={handleReviewTaskRequest} className={taskReviewDialog?.decision === 'approved' ? 'bg-success hover:bg-success/90' : ''} variant={taskReviewDialog?.decision === 'rejected' ? 'destructive' : 'default'}>
+              {taskReviewDialog?.decision === 'approved' ? 'Confirmer l\'approbation' : 'Confirmer le refus'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Review modification dialog */}
       <Dialog open={!!reviewDialog} onOpenChange={(open) => { if (!open) setReviewDialog(null); }}>
         <DialogContent className="max-w-md">
@@ -1565,7 +1734,7 @@ export default function ProjectDetailPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            {fileViewer?.fileType.startsWith('image/') ? (
+            {fileViewer && fileViewer.fileType.startsWith('image/') && fileViewer.fileType !== 'image/svg+xml' ? (
               <div>
                 <div className="flex justify-center mb-3">
                   <a
@@ -1587,9 +1756,13 @@ export default function ProjectDetailPage() {
                 </div>
                 <p className="text-sm font-medium">{fileViewer?.fileName}</p>
                 <p className="text-xs text-muted-foreground">Ce type de fichier ne peut pas être prévisualisé.</p>
-                <Button size="sm" className="mt-2" onClick={() => fileViewer && window.open(fileViewer.url, '_blank')}>
-                  <Download className="h-3.5 w-3.5 mr-2" /> Télécharger le fichier
-                </Button>
+                <a
+                  href={fileViewer?.url}
+                  download={fileViewer?.fileName}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium px-4 py-2 hover:bg-primary/90 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" /> Télécharger le fichier
+                </a>
               </div>
             )}
           </div>
@@ -1646,6 +1819,16 @@ function ModificationStatusBadge({ status }: { status: 'pending' | 'pending_clie
     pending_client: { label: 'Validation client', className: 'bg-info/15 text-info border-info/30' },
     approved: { label: 'Approuvée', className: 'bg-success/15 text-success border-success/30' },
     rejected: { label: 'Rejetée', className: 'bg-destructive/15 text-destructive border-destructive/30' },
+  };
+  const c = config[status];
+  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
+}
+
+function TaskRequestStatusBadge({ status }: { status: TaskRequest['status'] }) {
+  const config = {
+    pending: { label: 'En attente', className: 'bg-warning/15 text-warning border-warning/30' },
+    approved: { label: 'Acceptée', className: 'bg-success/15 text-success border-success/30' },
+    rejected: { label: 'Refusée', className: 'bg-destructive/15 text-destructive border-destructive/30' },
   };
   const c = config[status];
   return <Badge variant="outline" className={c.className}>{c.label}</Badge>;

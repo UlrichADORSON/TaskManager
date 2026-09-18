@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import type {
   User, Project, AppNotification, Subtask, SubtaskStatus,
   ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
-  ModificationTarget, Role, MemberSpecialty, CalendarEvent, ProjectVersion,
+  ModificationTarget, Role, MemberSpecialty, CalendarEvent, ProjectVersion, TaskRequest, Priority,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -34,6 +34,12 @@ interface SuggestModificationData {
   reason: string;
 }
 
+interface RequestTaskData {
+  title: string;
+  description: string;
+  priority: Priority;
+}
+
 interface AppState {
   currentUser: User | null;
   sessionInitialized: boolean;
@@ -61,6 +67,8 @@ interface AppState {
   toggleTaskActive: (projectId: string, subtaskId: string) => void;
   suggestModification: (data: SuggestModificationData) => void;
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
+  requestTask: (projectId: string, data: RequestTaskData) => void;
+  reviewTaskRequest: (projectId: string, requestId: string, decision: 'approved' | 'rejected', note: string) => void;
   addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
   addSubtaskAttachment: (projectId: string, subtaskId: string, attachment: Attachment) => void;
   validateSubtaskAttachment: (projectId: string, subtaskId: string, attachmentId: string, action: 'approve' | 'reject') => void;
@@ -247,6 +255,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       progressTimeline: [],
       calendarEvents: [],
       modifications: [],
+      taskRequests: [],
       platformUsers: data.platformUsers,
       desiredFeatures: data.desiredFeatures,
       necessaryPages: data.necessaryPages,
@@ -682,6 +691,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, users, projects]);
 
+  // ---- Client task requests (validated by the admin)
+  const requestTask: AppState['requestTask'] = useCallback((projectId, data) => {
+    if (!currentUser || currentUser.role !== 'client' || !data.title.trim()) return;
+    const proj = projects.find((p) => p.id === projectId);
+    if (!proj || proj.clientId !== currentUser.id) return;
+    const request: TaskRequest = {
+      id: `tr-${Date.now()}`,
+      projectId,
+      clientId: currentUser.id,
+      title: data.title.trim(),
+      description: data.description.trim(),
+      priority: data.priority,
+      status: 'pending',
+      reviewedById: null,
+      reviewedAt: null,
+      reviewNote: '',
+      createdAt: new Date().toISOString(),
+    };
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId ? { ...p, taskRequests: [request, ...p.taskRequests] } : p
+    ));
+    pushNotification(setNotifications, {
+      userId: 'u-admin-1',
+      type: 'task_requested',
+      title: 'Demande de tâche client',
+      message: `« ${proj.title} » : ${currentUser.name} demande une nouvelle tâche « ${request.title} ».`,
+      projectId,
+    });
+  }, [currentUser, projects]);
+
+  const reviewTaskRequest: AppState['reviewTaskRequest'] = useCallback((projectId, requestId, decision, note) => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    const proj = projects.find((p) => p.id === projectId);
+    const req = proj?.taskRequests.find((r) => r.id === requestId);
+    if (!proj || !req || req.status !== 'pending') return;
+
+    const reviewedAt = new Date().toISOString();
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      let subtasks = p.subtasks;
+      let projPatch: Partial<typeof p> = {};
+      if (decision === 'approved') {
+        const newSubtask: Subtask = {
+          id: `st-${Date.now()}`,
+          projectId,
+          title: req.title,
+          description: req.description,
+          status: 'todo',
+          priority: req.priority,
+          assignedToId: null,
+          dependsOnId: null,
+          startDate: new Date().toISOString(),
+          dueDate: p.endDate,
+          progress: 0,
+          attachments: [],
+          comments: [],
+          isActive: false,
+          workSessions: [],
+          createdAt: reviewedAt,
+        };
+        subtasks = [...p.subtasks, newSubtask];
+        projPatch = { status: p.status === 'assigned' ? ('in_progress' as ProjectStatus) : p.status };
+      }
+      const taskRequests = p.taskRequests.map((r) =>
+        r.id === requestId
+          ? { ...r, status: decision, reviewedById: currentUser.id, reviewedAt, reviewNote: note }
+          : r
+      );
+      return { ...p, ...projPatch, taskRequests, subtasks };
+    }));
+    pushNotification(setNotifications, {
+      userId: proj.clientId,
+      type: decision === 'approved' ? 'task_request_approved' : 'task_request_rejected',
+      title: decision === 'approved' ? 'Tâche ajoutée' : 'Demande refusée',
+      message: decision === 'approved'
+        ? `Votre demande « ${req.title} » a été acceptée et ajoutée au projet « ${proj.title} ».`
+        : `Votre demande « ${req.title} » a été refusée${note ? ` : ${note}` : ''}.`,
+      projectId,
+    });
+  }, [currentUser, projects]);
+
   // ---- Task comments
   const addSubtaskComment: AppState['addSubtaskComment'] = useCallback((projectId, subtaskId, content) => {
     if (!currentUser || !content.trim()) return;
@@ -904,7 +994,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 submitProject, validateProject, revertProjectValidation, rejectProject, assignManager, updateProjectStatus,
     addProjectMember, removeProjectMember,
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
-    suggestModification, reviewModification,
+suggestModification, reviewModification,
+       requestTask, reviewTaskRequest,
     addSubtaskComment,
     addSubtaskAttachment,
     validateSubtaskAttachment,
@@ -919,7 +1010,8 @@ submitProject, validateProject, revertProjectValidation, rejectProject, assignMa
 submitProject, validateProject, revertProjectValidation, rejectProject, assignManager, updateProjectStatus,
        addProjectMember, removeProjectMember,
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
-       suggestModification, reviewModification,
+suggestModification, reviewModification,
+    requestTask, reviewTaskRequest,
        addSubtaskComment,
        addSubtaskAttachment,
        validateSubtaskAttachment,

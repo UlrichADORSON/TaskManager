@@ -7,7 +7,6 @@ import {
   ChevronRight, Image as ImageIcon, FileText, Download, X, Upload,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { PriorityBadge } from '@/components/shared/badges';
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { ProgressBar } from '@/components/shared/progress';
@@ -130,7 +129,7 @@ export function KanbanBoard({
               </button>
             </div>
             <div className="p-4">
-              {viewingFile.fileType.startsWith('image/') ? (
+              {viewingFile.fileType.startsWith('image/') && viewingFile.fileType !== 'image/svg+xml' ? (
                 <div>
                   <div className="flex justify-center mb-3">
                     <a
@@ -147,9 +146,13 @@ export function KanbanBoard({
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                   <p className="text-sm text-muted-foreground mb-3">{viewingFile.fileName}</p>
-                  <Button size="sm" onClick={() => window.open(viewingFile.url, '_blank')}>
-                    <Download className="h-3.5 w-3.5 mr-2" /> Télécharger
-                  </Button>
+                  <a
+                    href={viewingFile.url}
+                    download={viewingFile.fileName}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium px-3.5 py-2 hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Télécharger
+                  </a>
                 </div>
               )}
             </div>

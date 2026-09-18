@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
   AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
-  MessageSquare, Paperclip, SlidersHorizontal, Undo2,
+  MessageSquare, Paperclip, SlidersHorizontal, Undo2, Inbox, ClipboardCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -37,6 +37,9 @@ const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; colo
   calendar_event: { icon: CalendarPlus, color: 'text-accent bg-accent/10' },
   task_comment: { icon: MessageSquare, color: 'text-primary bg-primary/10' },
   project_attachment: { icon: Paperclip, color: 'text-info bg-info/10' },
+  task_requested: { icon: Inbox, color: 'text-warning bg-warning/10' },
+  task_request_approved: { icon: ClipboardCheck, color: 'text-info bg-info/10' },
+  task_request_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
 };
 
 const notificationFilters: { value: AppNotification['type'] | 'all'; label: string }[] = [
@@ -53,6 +56,9 @@ const notificationFilters: { value: AppNotification['type'] | 'all'; label: stri
   { value: 'calendar_event', label: 'Rendez-vous' },
   { value: 'task_comment', label: 'Commentaires' },
   { value: 'project_attachment', label: 'Pièces jointes' },
+  { value: 'task_requested', label: 'Demandes de tâches' },
+  { value: 'task_request_approved', label: 'Tâches acceptées' },
+  { value: 'task_request_rejected', label: 'Tâches refusées' },
   { value: 'member_added', label: 'Membres ajoutés' },
   { value: 'member_created', label: 'Comptes créés' },
 ];

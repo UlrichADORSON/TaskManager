@@ -28,6 +28,9 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   calendar_event: '📅',
   task_comment: '💬',
   project_attachment: '📎',
+  task_requested: '📥',
+  task_request_approved: '✅',
+  task_request_rejected: '❌',
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {

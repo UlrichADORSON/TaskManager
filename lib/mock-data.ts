@@ -371,6 +371,9 @@ export const mockProjects: Project[] = [
       { id: 'mod-1', projectId: 'p-1', subtaskId: 'st-1-3', target: 'subtask', requestedById: 'u-emp-1', requestedByName: 'Thomas Dubois', field: 'dueDate', oldValue: '2026-07-15', newValue: '2026-07-22', reason: 'Le délai initial ne suffit pas suite aux retours du client sur les maquettes. Une semaine supplémentaire est nécessaire.', status: 'pending', reviewedById: null, reviewNote: '', createdAt: '2026-09-01T10:00:00Z', reviewedAt: null },
       { id: 'mod-2', projectId: 'p-1', subtaskId: 'st-1-4', target: 'subtask', requestedById: 'u-emp-3', requestedByName: 'Marco Rossi', field: 'description', oldValue: 'Créer l\'API REST (Laravel) et la base de données MySQL.', newValue: 'Créer l\'API REST (Laravel), la base de données MySQL et intégrer un système de cache Redis pour optimiser les performances.', reason: 'Les temps de réponse sur la gestion du catalogue dépassent les 2 secondes. Ajouter Redis améliorerait drastiquement les performances.', status: 'approved', reviewedById: 'u-admin-1', reviewNote: 'Demande justifiée, le cache Redis est une excellente idée pour les performances.', createdAt: '2026-08-28T14:00:00Z', reviewedAt: '2026-08-29T09:00:00Z' },
     ],
+    taskRequests: [
+      { id: 'tr-1', projectId: 'p-1', clientId: 'u-cli-1', title: 'Ajouter une page FAQ', description: 'Ajouter une page FAQ responsive accessible depuis le pied de page du site, avec 8 questions/réponses pré-remplies.', priority: 'low', status: 'pending', reviewedById: null, reviewedAt: null, reviewNote: '', createdAt: '2026-09-14T09:00:00Z' },
+    ],
     clientMeeting: { date: '2026-06-10T10:00:00Z', note: 'Rapport de cadrage validé avec les 6 pages et le paiement Stripe.' },
     createdAt: '2026-05-20T08:00:00Z',
   },
@@ -405,6 +408,9 @@ export const mockProjects: Project[] = [
     modifications: [
       { id: 'mod-3', projectId: 'p-2', subtaskId: 'st-2-3', target: 'subtask', requestedById: 'u-emp-1', requestedByName: 'Thomas Dubois', field: 'title', oldValue: 'Intégration nouvelle UI', newValue: 'Intégration nouvelle UI + migration composants legacy', reason: 'L\'ancien site contient plus de composants legacy que prévu. Le titre devrait refléter le périmètre réel.', status: 'rejected', reviewedById: 'u-admin-1', reviewNote: 'Le changement de titre n\'est pas nécessaire. La description suffit à clarifier le périmètre.', createdAt: '2026-08-15T11:00:00Z', reviewedAt: '2026-08-16T08:00:00Z' },
     ],
+    taskRequests: [
+      { id: 'tr-2', projectId: 'p-2', clientId: 'u-cli-2', title: 'Ajouter un formulaire de devis', description: 'Formulaire de devis en ligne (nom, email, descriptif du projet) avec envoi par email.', priority: 'medium', status: 'approved', reviewedById: 'u-admin-1', reviewedAt: '2026-08-20T10:00:00Z', reviewNote: 'Approuvé — une sous-tâche a été ajoutée au projet.', createdAt: '2026-08-19T09:00:00Z' },
+    ],
     clientMeeting: null,
     createdAt: '2026-06-25T08:00:00Z',
   },
@@ -434,6 +440,7 @@ export const mockProjects: Project[] = [
     calendarEvents: calendarEvents['p-3'],
     attachments: [makeAttachment('att-p3-1', 'brief_app_fitness.pdf', 'application/pdf', 'u-cli-3')],
     modifications: [],
+    taskRequests: [],
     clientMeeting: null,
     createdAt: '2026-08-20T08:00:00Z',
   },
@@ -463,6 +470,7 @@ export const mockProjects: Project[] = [
     calendarEvents: [],
     attachments: [makeAttachment('att-p4-1', 'spec_analytics.pdf', 'application/pdf', 'u-cli-1')],
     modifications: [],
+    taskRequests: [],
     clientMeeting: null,
     createdAt: '2026-08-25T08:00:00Z',
   },
@@ -493,6 +501,7 @@ export const mockProjects: Project[] = [
     calendarEvents: [],
     attachments: [],
     modifications: [],
+    taskRequests: [],
     clientMeeting: null,
     statusChangedAt: '2026-09-15T06:00:00Z',
     createdAt: '2026-08-10T08:00:00Z',
@@ -526,6 +535,7 @@ export const mockProjects: Project[] = [
     calendarEvents: [],
     attachments: [],
     modifications: [],
+    taskRequests: [],
     clientMeeting: null,
     statusChangedAt: '2026-08-10T10:00:00Z',
     versions: [
@@ -561,6 +571,7 @@ export const mockProjects: Project[] = [
     calendarEvents: [],
     attachments: [],
     modifications: [],
+    taskRequests: [],
     rejectionReason: 'Périmètre trop vague. Merci de détailler les applicatifs concernés et la méthodologie d\'audit.',
     clientMeeting: null,
     statusChangedAt: '2026-08-20T10:00:00Z',
@@ -579,4 +590,5 @@ export const mockNotifications: AppNotification[] = [
   { id: 'n-7', userId: 'u-emp-3', type: 'subtask_assigned', title: 'Nouvelle sous-tâche', message: 'Vous avez été assigné à « Développement Backend & API ».', projectId: 'p-1', read: false, createdAt: '2026-06-01T09:00:00Z' },
   { id: 'n-8', userId: 'u-cli-3', type: 'project_rejected', title: 'Projet rejeté', message: 'Votre projet « Refonte Logo & Identité — UrbanVibes » a été rejeté. Consultez le motif.', projectId: 'p-5', read: false, createdAt: '2026-08-12T10:00:00Z' },
   { id: 'n-9', userId: 'u-mgr-2', type: 'subtask_assigned', title: 'Projet assigné', message: 'Le projet « Refonte Site Vitrine EcoShop » vous a été assigné.', projectId: 'p-2', read: true, createdAt: '2026-06-26T10:00:00Z' },
+  { id: 'n-10', userId: 'u-admin-1', type: 'task_requested', title: 'Demande de tâche client', message: '« Plateforme E-commerce TechStart » : le client demande l\'ajout d\'une page FAQ.', projectId: 'p-1', read: false, createdAt: '2026-09-14T09:00:01Z' },
 ];

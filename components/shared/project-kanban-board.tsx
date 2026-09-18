@@ -61,7 +61,8 @@ export function ProjectKanbanBoard({ projects, users, canManage, onMove, validat
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [assignProject, setAssignProject] = useState<Project | null>(null);
-  const columns = getColumns(validationColumn);
+  const allColumns = getColumns(validationColumn);
+  const visibleColumns = allColumns.filter((col) => projects.some((p) => p.status === col.id));
   const toValidate = validationColumn
     ? projects.filter((p) => p.status === 'pending')
     : [];
@@ -92,9 +93,9 @@ export function ProjectKanbanBoard({ projects, users, canManage, onMove, validat
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 items-start">
-        {validationColumn && (
-          <div className="min-w-0">
+      <div className="flex flex-wrap gap-4 items-start">
+        {validationColumn && toValidate.length > 0 && (
+          <div className="flex-1 min-w-[240px]">
             <div className={cn('flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3', VALIDATION_COLUMN.className)}>
               <ShieldCheck className={cn('h-4 w-4', VALIDATION_COLUMN.text)} />
               <h3 className={cn('text-sm font-semibold', VALIDATION_COLUMN.text)}>{VALIDATION_COLUMN.label}</h3>
@@ -119,16 +120,11 @@ export function ProjectKanbanBoard({ projects, users, canManage, onMove, validat
                   />
                 );
               })}
-              {toValidate.length === 0 && (
-                <div className="rounded-xl border-2 border-dashed border-border/50 p-6 text-center">
-                  <p className="text-xs text-muted-foreground">Tout est à jour</p>
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {columns.map((col) => {
+        {visibleColumns.map((col) => {
           const list = projects.filter((p) => p.status === col.id);
           return (
             <div
@@ -142,7 +138,7 @@ export function ProjectKanbanBoard({ projects, users, canManage, onMove, validat
               }}
               onDrop={(e) => handleDrop(e, col.id)}
               className={cn(
-                'min-w-0 rounded-2xl transition-colors',
+                'flex-1 min-w-[240px] rounded-2xl transition-colors',
                 dragOverCol === col.id && 'bg-primary/5 ring-2 ring-primary/40'
               )}
             >
@@ -168,11 +164,6 @@ export function ProjectKanbanBoard({ projects, users, canManage, onMove, validat
                     onDragEnd={() => setDraggingId(null)}
                   />
                 ))}
-                {list.length === 0 && (
-                  <div className="rounded-xl border-2 border-dashed border-border/50 p-6 text-center">
-                    <p className="text-xs text-muted-foreground">Aucun projet</p>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -276,7 +267,10 @@ function KanbanProjectCard({ project, users, canManage, onStatusChange, dragging
       </div>
       <p className="text-xs text-muted-foreground mb-2.5 truncate">{client?.name ?? 'Client inconnu'}</p>
 
-      <ProgressBar value={project.progress} indicatorClassName="bg-primary" className="h-1.5 mb-2.5" />
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <ProgressBar value={project.progress} indicatorClassName="bg-primary" className="h-1.5" />
+        <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{project.progress}%</span>
+      </div>
 
       <div className="space-y-1 mb-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5 truncate">

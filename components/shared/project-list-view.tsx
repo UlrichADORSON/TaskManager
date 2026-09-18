@@ -78,7 +78,10 @@ export function ProjectListView({ projects }: { projects: Project[] }) {
                 </div>
                 <StatusBadge status={p.status} />
               </div>
-              <ProgressBar value={p.progress} indicatorClassName="bg-primary" />
+              <div className="flex items-center justify-between gap-2">
+                <ProgressBar value={p.progress} indicatorClassName="bg-primary" className="flex-1" />
+                <span className="text-xs font-semibold tabular-nums text-muted-foreground">{p.progress}%</span>
+              </div>
               <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
                 <span className="flex items-center gap-1">
                   <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/60" />
