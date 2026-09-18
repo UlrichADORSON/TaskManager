@@ -120,8 +120,8 @@ export function useApp() {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessionInitialized, setSessionInitialized] = useState(false);
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
 
   const [specialties, setSpecialties] = useState<string[]>(() => {
@@ -199,22 +199,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           // Sync users from backend
           try {
             const backendUsers = await fetchUsers();
-            if (!cancelled && backendUsers.length > 0) {
+            if (!cancelled) {
               setUsers(backendUsers);
             }
           } catch {
-            // fallback to mock data
+            // keep existing users on error
           }
 
           // Sync projects from backend
           try {
             const backendProjects = await fetchProjects();
-            if (!cancelled && backendProjects.length > 0) {
+            if (!cancelled) {
               setProjects(backendProjects);
             }
           } catch {
-            // fallback to mock data
+            // keep existing projects on error
           }
+        } else {
+          // No token, load mock data for development
+          setUsers(mockUsers);
+          setProjects(mockProjects);
         }
       } catch {
         // token invalide ou back injoignable : on reste déconnecté
@@ -248,21 +252,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Sync users from backend
     try {
       const backendUsers = await fetchUsers();
-      if (backendUsers.length > 0) {
-        setUsers(backendUsers);
-      }
+      setUsers(backendUsers);
     } catch {
-      // fallback to mock data
+      // keep existing users on error
     }
 
     // Sync projects from backend
     try {
       const backendProjects = await fetchProjects();
-      if (backendProjects.length > 0) {
-        setProjects(backendProjects);
-      }
+      setProjects(backendProjects);
     } catch {
-      // fallback to mock data
+      // keep existing projects on error
     }
 
     return true;
@@ -473,6 +473,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // ignore refresh error
       }
+
+      // Success notification
+      setNotifications((prev) => [
+        { id: `n-${Date.now()}`, userId: data.userId, type: 'member_added', title: 'Ajouté à un projet', message: `Vous avez été ajouté à un projet.`, projectId, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
     } catch (err) {
       // Rollback on error
       setProjects((prev) => prev.map((p) =>
@@ -480,11 +486,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ));
       throw err;
     }
-
-    setNotifications((prev) => [
-      { id: `n-${Date.now()}`, userId: data.userId, type: 'member_added', title: 'Ajouté à un projet', message: `Vous avez été ajouté à un projet.`, projectId, read: false, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
   }, []);
 
   const removeProjectMember: AppState['removeProjectMember'] = useCallback(async (projectId, userId) => {

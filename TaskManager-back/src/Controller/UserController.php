@@ -12,9 +12,42 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted('ROLE_ADMIN')]
 class UserController extends AbstractController
 {
+    #[Route('/api/users', name: 'api_users_list', methods: ['GET'])]
+    public function list(EntityManagerInterface $em): JsonResponse
+    {
+        $users = $em->getRepository(User::class)->findAll();
+        $data = array_map(function (User $u) {
+            $roles = $u->getRoles();
+            $role = 'membre';
+            if (in_array('ROLE_ADMIN', $roles, true)) {
+                $role = 'admin';
+            } elseif (in_array('ROLE_CHEF_DE_PROJET', $roles, true)) {
+                $role = 'chef_de_projet';
+            } elseif (in_array('ROLE_CLIENT', $roles, true)) {
+                $role = 'client';
+            } elseif (in_array('ROLE_MEMBRE', $roles, true)) {
+                $role = 'membre';
+            }
+            return [
+                'id' => $u->getId(),
+                'name' => $u->getName(),
+                'email' => $u->getEmail(),
+                'role' => $role,
+                'memberSpecialty' => $u->getMemberSpecialty(),
+                'avatarUrl' => $u->getAvatarUrl(),
+                'phone' => $u->getPhone(),
+                'company' => $u->getCompany(),
+                'address' => $u->getAddress(),
+                'bio' => $u->getBio(),
+                'createdAt' => $u->getCreatedAt()?->format(\DateTimeInterface::ATOM),
+            ];
+        }, $users);
+
+        return $this->json($data);
+    }
+
     #[Route('/api/users', name: 'api_users_create', methods: ['POST'])]
     public function create(
         Request $request,

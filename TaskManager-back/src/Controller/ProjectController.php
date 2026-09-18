@@ -100,10 +100,30 @@ class ProjectController extends AbstractController
         UserRepository $userRepository,
         EntityManagerInterface $em
     ): JsonResponse {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         $projectId = (int) $id;
         $project = $projectRepository->find($projectId);
         if (!$project) {
             return $this->json(['message' => 'Projet introuvable.'], 404);
+        }
+
+        // Vérifier les permissions : admin, client du projet, ou chef_de_projet déjà membre
+        $isAdmin = in_array('ROLE_ADMIN', $currentUser->getRoles(), true);
+        $isClient = $project->getClient()?->getId() === $currentUser->getId();
+        $isManager = $project->getManager()?->getId() === $currentUser->getId();
+        $members = $project->getMembers() ?? [];
+        $isMember = false;
+        foreach ($members as $m) {
+            if (($m['userId'] ?? '') === (string) $currentUser->getId()) {
+                $isMember = true;
+                break;
+            }
+        }
+        $isProjectMember = $isClient || $isManager || $isMember;
+        if (!$isAdmin && !$isProjectMember) {
+            return $this->json(['message' => 'Non autorisé.'], 403);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -157,11 +177,31 @@ class ProjectController extends AbstractController
         ProjectRepository $projectRepository,
         EntityManagerInterface $em
     ): JsonResponse {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         $projId = (int) $projectId;
         $uid = (string) $userId;
         $project = $projectRepository->find($projId);
         if (!$project) {
             return $this->json(['message' => 'Projet introuvable.'], 404);
+        }
+
+        // Vérifier les permissions : admin, client du projet, ou chef_de_projet déjà membre
+        $isAdmin = in_array('ROLE_ADMIN', $currentUser->getRoles(), true);
+        $isClient = $project->getClient()?->getId() === $currentUser->getId();
+        $isManager = $project->getManager()?->getId() === $currentUser->getId();
+        $members = $project->getMembers() ?? [];
+        $isMember = false;
+        foreach ($members as $m) {
+            if (($m['userId'] ?? '') === (string) $currentUser->getId()) {
+                $isMember = true;
+                break;
+            }
+        }
+        $isProjectMember = $isClient || $isManager || $isMember;
+        if (!$isAdmin && !$isProjectMember) {
+            return $this->json(['message' => 'Non autorisé.'], 403);
         }
 
         $members = $project->getMembers() ?? [];
