@@ -12,6 +12,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_ADMIN')]
 class UserController extends AbstractController
 {
     #[Route('/api/users', name: 'api_users_list', methods: ['GET'])]
@@ -67,7 +68,6 @@ class UserController extends AbstractController
         $password = (string) ($data['password'] ?? '');
         $role = (string) ($data['role'] ?? 'membre');
 
-        // Validation des champs obligatoires
         if ($name === '' || $email === '' || $password === '') {
             return $this->json([
                 'message' => 'Le nom, l’email et le mot de passe sont obligatoires.'
@@ -86,7 +86,6 @@ class UserController extends AbstractController
             ], 400);
         }
 
-        // Rôles autorisés
         $allowedRoles = [
             'membre' => 'ROLE_MEMBRE',
             'chef_de_projet' => 'ROLE_CHEF_DE_PROJET',
@@ -98,7 +97,6 @@ class UserController extends AbstractController
             ], 400);
         }
 
-        // Vérifier si l’email existe déjà
         $existingUser = $em->getRepository(User::class)
             ->findOneBy(['email' => $email]);
 
@@ -157,5 +155,89 @@ class UserController extends AbstractController
                 \DateTimeInterface::ATOM
             ),
         ], 201);
+    }
+
+    #[Route('/api/users/{id}', name: 'api_users_update', methods: ['PATCH'])]
+    public function update(
+        int $id,
+        Request $request,
+        EntityManagerInterface $em,
+        UserPasswordHasherInterface $hasher
+    ): JsonResponse {
+        $user = $em->getRepository(User::class)->find($id);
+        if (!$user) {
+            return $this->json(['message' => 'Utilisateur introuvable'], 404);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['message' => 'Données JSON invalides.'], 400);
+        }
+
+        if (isset($data['role'])) {
+            $allowedRoles = [
+                'membre' => 'ROLE_MEMBRE',
+                'chef_de_projet' => 'ROLE_CHEF_DE_PROJET',
+                'client' => 'ROLE_CLIENT',
+                'admin' => 'ROLE_ADMIN',
+            ];
+            if (!isset($allowedRoles[$data['role']])) {
+                return $this->json(['message' => 'Rôle invalide.'], 400);
+            }
+            $user->setRoles([$allowedRoles[$data['role']]]);
+        }
+        if (isset($data['memberSpecialty'])) {
+            $user->setMemberSpecialty($data['memberSpecialty']);
+        }
+        if (isset($data['name'])) {
+            $user->setName(trim((string) $data['name']));
+        }
+        if (isset($data['email'])) {
+            $email = strtolower(trim((string) $data['email']));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return $this->json(['message' => 'Adresse email invalide.'], 400);
+            }
+            $user->setEmail($email);
+        }
+        if (isset($data['phone'])) {
+            $user->setPhone($data['phone']);
+        }
+        if (isset($data['company'])) {
+            $user->setCompany($data['company']);
+        }
+        if (isset($data['address'])) {
+            $user->setAddress($data['address']);
+        }
+        if (isset($data['bio'])) {
+            $user->setBio($data['bio']);
+        }
+        if (isset($data['avatarUrl'])) {
+            $user->setAvatarUrl($data['avatarUrl']);
+        }
+        if (!empty($data['password'])) {
+            if (strlen($data['password']) < 8) {
+                return $this->json(['message' => 'Le mot de passe doit contenir au moins 8 caractères.'], 400);
+            }
+            $user->setPassword($hasher->hashPassword($user, $data['password']));
+        }
+
+        try {
+            $em->flush();
+        } catch (UniqueConstraintViolationException) {
+            return $this->json(['message' => 'Cet email est déjà utilisé.'], 409);
+        }
+
+        return $this->json([
+            'id' => (string) $user->getId(),
+            'name' => $user->getName(),
+            'email' => $user->getEmail(),
+            'roles' => $user->getRoles(),
+            'memberSpecialty' => $user->getMemberSpecialty(),
+            'avatarUrl' => $user->getAvatarUrl(),
+            'phone' => $user->getPhone(),
+            'company' => $user->getCompany(),
+            'address' => $user->getAddress(),
+            'bio' => $user->getBio(),
+        ]);
     }
 }

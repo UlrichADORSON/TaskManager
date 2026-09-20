@@ -22,6 +22,9 @@ export function clearTokens() {
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) return null;
@@ -44,6 +47,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
+  const refreshToken = typeof window !== 'undefined' ? window.localStorage.getItem(REFRESH_TOKEN_KEY) : null;
 
   const doFetch = (bearerToken: string | null) =>
     fetch(`${API_BASE_URL}${path}`, {
@@ -57,8 +61,16 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
 
   let res = await doFetch(token);
 
-  if (res.status === 401 && token) {
-    const newToken = await refreshAccessToken();
+  if (res.status === 401 && (token || refreshToken)) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAccessToken().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
+    }
+
+    const newToken = await refreshPromise;
     if (newToken) {
       res = await doFetch(newToken);
     }
@@ -111,6 +123,33 @@ export async function loginRequest(email: string, password: string) {
   return data;
 }
 
+export async function registerRequest(data: {
+  name: string;
+  email: string;
+  password: string;
+  company?: string;
+  phone?: string;
+}) {
+  const res = await fetch(`${API_BASE_URL}/api/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: "Échec de l'inscription" }));
+    throw new Error(error.message || "Échec de l'inscription");
+  }
+
+  const response = await res.json();
+
+  if (response.token && response.refresh_token) {
+    setTokens(response.token, response.refresh_token);
+  }
+
+  return response;
+}
+
 export async function fetchMe() {
   const res = await apiFetch('/api/me');
   if (!res.ok) return null;
@@ -132,6 +171,38 @@ export async function fetchProjects(): Promise<Project[]> {
   const data = await res.json();
   if (!Array.isArray(data)) return [];
   return data.map((p: any) => mapBackendProjectToFrontProject(p));
+}
+
+export async function requestPasswordReset(email: string) {
+  const res = await fetch(`${API_BASE_URL}/api/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.message || "Erreur lors de la demande de réinitialisation");
+  }
+
+  return data;
+}
+
+export async function resetPassword(token: string, password: string) {
+  const res = await fetch(`${API_BASE_URL}/api/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.message || "Erreur lors de la réinitialisation");
+  }
+
+  return data;
 }
 
 function mapBackendProjectToFrontProject(backendProject: any): Project {

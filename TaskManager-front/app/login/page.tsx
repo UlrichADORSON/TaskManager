@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layers, Mail, Lock, Eye, EyeOff, Loader2, Sun, Moon, Shield, Briefcase, Wrench, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTheme } from '@/lib/theme-provider';
 import { useApp } from '@/lib/app-context';
 import { Button } from '@/components/ui/button';
@@ -177,7 +178,7 @@ export default function LoginPage() {
                     <input type="checkbox" className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5" defaultChecked />
                     <span>Se souvenir de moi</span>
                   </label>
-                  <a href="#" className="text-xs font-medium text-primary hover:underline">Mot de passe oublié ?</a>
+                  <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">Mot de passe oublié ?</Link>
                 </div>
               </div>
 
@@ -237,7 +238,7 @@ export default function LoginPage() {
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground mt-6">
-              Pas encore de compte ? <a href="#" className="text-primary hover:underline font-medium">Créer un compte</a>
+              Pas encore de compte ? <Link href="/signup" className="text-primary hover:underline font-medium">Créer un compte</Link>
             </p>
           </motion.div>
         </div>
