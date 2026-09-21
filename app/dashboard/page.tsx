@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   FolderKanban, Clock, CheckCircle2, Users, ShieldCheck, ListChecks,
   TrendingUp, FileText, CheckSquare, Briefcase, Layers, CalendarDays, Upload, Send,
-  Edit3, ArrowUpRight, MessageSquareQuote,
+  Edit3, ArrowUpRight, MessageSquareQuote, BarChart3,
 } from 'lucide-react';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import {
@@ -34,7 +34,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { projectStatusMeta, getUser, formatDate } from '@/lib/status';
 import { cn } from '@/lib/utils';
-import type { ProjectStatus, Priority } from '@/types';
+import type { ProjectStatus, Priority, SubtaskStatus } from '@/types';
 
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
@@ -46,6 +46,21 @@ const STATUS_CHART_COLORS: Record<ProjectStatus, string> = {
   in_progress: 'hsl(var(--primary))',
   completed: 'hsl(var(--success))',
 };
+
+function subtaskBarColor(status: SubtaskStatus): string {
+  switch (status) {
+    case 'done':
+      return 'hsl(var(--success))';
+    case 'in_progress':
+      return 'hsl(var(--primary))';
+    case 'review':
+      return 'hsl(var(--chart-5))';
+    case 'cancelled':
+      return 'hsl(var(--destructive))';
+    default:
+      return 'hsl(var(--muted-foreground))';
+  }
+}
 
 export default function DashboardPage() {
   const user = useAuthGuard();
@@ -61,6 +76,7 @@ export default function DashboardPage() {
   });
   const [reqPhoto, setReqPhoto] = useState<{ url: string; name: string } | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [selectedProgressProjectId, setSelectedProgressProjectId] = useState('');
 
   const clientProjects = useMemo(
     () => user ? projects.filter((p) => p.clientId === user.id && !isProjectArchived(p)) : [],
@@ -86,6 +102,36 @@ export default function DashboardPage() {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([month, v]) => ({ month, planned: Math.round(v.planned / v.count), actual: Math.round(v.actual / v.count) }));
   }, [clientProjects]);
+
+  const selectedProgressProject = useMemo(
+    () => user ? clientProjects.find((p) => p.id === selectedProgressProjectId) ?? clientProjects[0] ?? null : null,
+    [clientProjects, selectedProgressProjectId, user],
+  );
+
+  const selectedSubtaskLines = useMemo(() => {
+    if (!selectedProgressProject) return null;
+    const subtasks = (selectedProgressProject.subtasks ?? []).filter((s) => s.status !== 'cancelled');
+    if (subtasks.length === 0) return null;
+    const day = (iso: string) => String(iso).slice(0, 10);
+    const keys = Array.from(
+      new Set(subtasks.flatMap((s) => [day(s.startDate), day(s.dueDate)])),
+    ).sort();
+    const rows: Array<Record<string, string | number>> = keys.map((key) => ({ key }));
+    subtasks.forEach((s) => {
+      const si = keys.indexOf(day(s.startDate));
+      const ei = keys.indexOf(day(s.dueDate));
+      for (let i = Math.min(si, ei); i <= Math.max(si, ei); i++) {
+        const row = rows[i];
+        if (!row) continue;
+        const t = si === ei ? 1 : (i - si) / (ei - si);
+        row[s.id] = Math.round(s.progress * t);
+      }
+    });
+    return {
+      rows,
+      series: subtasks.map((s) => ({ id: s.id, title: s.title, status: s.status })),
+    };
+  }, [selectedProgressProject]);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -650,6 +696,102 @@ export default function DashboardPage() {
               <Button className="w-full" onClick={handleRequestTask} disabled={!reqForm.title.trim() || clientProjects.length === 0}>
                 <Send className="h-4 w-4 mr-2" /> Envoyer la demande
               </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Client: progression d'un projet sélectionné */}
+      {role === 'client' && selectedProgressProject && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.22 }}
+          className="mb-6"
+        >
+          <Card className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
+              <h3 className="font-semibold flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" /> Progression d{'\''}un projet
+              </h3>
+              <Select value={selectedProgressProject.id} onValueChange={setSelectedProgressProjectId}>
+                <SelectTrigger className="sm:w-80 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-sm text-muted-foreground">{selectedProgressProject.title}</span>
+              <span className="text-xs font-semibold text-primary">Avancement actuel : {selectedProgressProject.progress}%</span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border',
+                  projectStatusMeta[selectedProgressProject.status]?.color === 'success'
+                    ? 'bg-success/15 text-success border-success/30'
+                    : projectStatusMeta[selectedProgressProject.status]?.color === 'warning'
+                      ? 'bg-warning/15 text-warning border-warning/30'
+                      : projectStatusMeta[selectedProgressProject.status]?.color === 'destructive'
+                        ? 'bg-destructive/15 text-destructive border-destructive/30'
+                        : 'bg-info/15 text-info border-info/30',
+                )}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {projectStatusMeta[selectedProgressProject.status]?.label}
+              </span>
+            </div>
+            <div className="h-64 sm:h-72">
+              {selectedSubtaskLines && selectedSubtaskLines.rows.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={selectedSubtaskLines.rows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                    <XAxis
+                      dataKey="key"
+                      tickFormatter={(v: string) =>
+                        new Date(`${v}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                      }
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(value) => [`${value}%`]}
+                      labelFormatter={(v) =>
+                        new Date(`${v}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                      }
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="plainline" />
+                    {selectedSubtaskLines.series.map((s) => (
+                      <Line
+                        key={s.id}
+                        type="monotone"
+                        dataKey={s.id}
+                        name={s.title}
+                        stroke={subtaskBarColor(s.status)}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                  Aucune sous-tâche pour ce projet.
+                </div>
+              )}
             </div>
           </Card>
         </motion.div>
