@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   FolderKanban, Clock, CheckCircle2, Users, ShieldCheck, ListChecks,
   TrendingUp, FileText, CheckSquare, Briefcase, Layers, CalendarDays, Upload, Send,
-  Edit3, ArrowUpRight,
+  Edit3, ArrowUpRight, MessageSquareQuote,
 } from 'lucide-react';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import {
@@ -193,6 +193,15 @@ export default function DashboardPage() {
     );
   }, [user, projects]);
 
+  // ---- Requêtes envoyées par l'équipe (admin / chef / membre)
+  const myRequetes = useMemo(() => {
+    if (!user || user.role === 'client') return [];
+    return projects.flatMap((p) =>
+      p.requetes.filter((r) => r.createdById === user.id).map((r) => ({ ...r, projectId: p.id, projectTitle: p.title }))
+    );
+  }, [user, projects]);
+  const myRequetesPending = myRequetes.filter((r) => r.status === 'pending');
+
   if (!user) return null;
 
   // ---- Role-specific stats
@@ -207,17 +216,15 @@ export default function DashboardPage() {
 
   const canManage = role === 'admin' || role === 'chef_de_projet';
 
-  // ---- Modifications demandées par l'équipe sur les projets du client
-  const clientTeamMods = role === 'client'
+  // ---- Requêtes demandées au client par l'équipe
+  const clientRequetes = role === 'client'
     ? projects.flatMap((p) =>
         p.clientId === user.id
-          ? p.modifications
-              .filter((m) => getUser(users, m.requestedById)?.role !== 'client')
-              .map((m) => ({ ...m, projectId: p.id, projectTitle: p.title }))
+          ? p.requetes.map((r) => ({ ...r, projectId: p.id, projectTitle: p.title }))
           : []
       )
     : [];
-  const clientTeamModsPending = clientTeamMods.filter((m) => m.status === 'pending' || m.status === 'pending_client');
+  const clientRequetesPending = clientRequetes.filter((r) => r.status === 'pending');
 
   // ---- Stats per role
   let stats: { label: string; value: string | number; icon: any; color?: string; trend?: { value: string; positive: boolean }; onClick?: () => void }[] = [];
@@ -252,7 +259,7 @@ export default function DashboardPage() {
       { label: 'En cours', value: myProjects.filter((p) => p.status === 'in_progress').length, icon: TrendingUp, color: 'text-accent', onClick: () => router.push('/projects') },
       { label: 'En attente', value: myProjects.filter((p) => p.status === 'pending').length, icon: Clock, color: 'text-warning', onClick: () => router.push('/projects') },
       { label: 'Terminés', value: myProjects.filter((p) => p.status === 'completed').length, icon: CheckCircle2, color: 'text-success', onClick: () => router.push('/projects') },
-      { label: 'Modifs. équipe', value: clientTeamModsPending.length, icon: Edit3, color: 'text-info', onClick: () => router.push('/modifications') },
+      { label: 'Requêtes demandées', value: clientRequetesPending.length, icon: MessageSquareQuote, color: 'text-info', onClick: () => router.push('/requetes') },
     ];
   }
 
@@ -455,6 +462,63 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
+      {/* Requêtes envoyées (admin / chef / membre) */}
+      {(role === 'admin' || role === 'chef_de_projet' || role === 'membre') && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="mb-6"
+        >
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <MessageSquareQuote className="h-4 w-4 text-primary" /> Mes requêtes envoyées
+                {myRequetesPending.length > 0 && (
+                  <span className="rounded-full bg-warning/15 text-warning border border-warning/30 px-2 py-0.5 text-[11px] font-semibold tabular-nums">
+                    {myRequetesPending.length} en attente de réponse
+                  </span>
+                )}
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/requetes')}>Voir tout</Button>
+            </div>
+            {myRequetes.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Send className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Vous n&apos;avez pas encore envoyé de requête au client.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {myRequetes.slice(0, 4).map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => router.push('/requetes')}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 hover:bg-muted/50 transition-all text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.projectTitle}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{r.content}</p>
+                      <span className="text-[10px] text-muted-foreground">{formatDate(r.createdAt)}</span>
+                    </div>
+                    {r.status === 'pending' ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30 flex-shrink-0">
+                        En attente
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30 flex-shrink-0">
+                        Répondu
+                      </span>
+                    )}
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      )}
+
       {/* Client: progression globale (courbe) + demande de tâche */}
       {role === 'client' && (
         <motion.div
@@ -622,8 +686,8 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* Client: demandes de modification de l'équipe */}
-      {role === 'client' && clientTeamMods.length > 0 && (
+      {/* Client: requêtes demandées par l'équipe */}
+      {role === 'client' && clientRequetes.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -633,32 +697,40 @@ export default function DashboardPage() {
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="font-semibold flex items-center gap-2">
-                <Edit3 className="h-4 w-4 text-info" /> Demandes de modification de l&apos;équipe
-                {clientTeamModsPending.length > 0 && (
-                  <span className="rounded-full bg-info/15 text-info border border-info/30 px-2 py-0.5 text-[11px] font-semibold tabular-nums">
-                    {clientTeamModsPending.length} à valider
+                <MessageSquareQuote className="h-4 w-4 text-info" /> Requêtes demandées
+                {clientRequetesPending.length > 0 && (
+                  <span className="rounded-full bg-warning/15 text-warning border border-warning/30 px-2 py-0.5 text-[11px] font-semibold tabular-nums">
+                    {clientRequetesPending.length} à répondre
                   </span>
                 )}
               </h3>
-              <Button variant="ghost" size="sm" onClick={() => router.push('/modifications')}>Voir tout</Button>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/requetes')}>Voir tout</Button>
             </div>
             <div className="space-y-2.5">
-              {clientTeamMods.slice(0, 4).map((m) => {
-                const requester = getUser(users, m.requestedById);
+              {clientRequetes.slice(0, 4).map((r) => {
+                const requester = getUser(users, r.createdById);
                 return (
                   <button
-                    key={m.id}
+                    key={r.id}
                     type="button"
-                    onClick={() => router.push(`/projects/${m.projectId}?tab=modifications`)}
+                    onClick={() => router.push('/requetes')}
                     className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 hover:bg-muted/50 transition-all text-left"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {requester?.name ?? m.requestedByName} · {m.projectTitle}
+                        {requester?.name ?? r.createdByName} · {r.projectTitle}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{m.field} : « {m.newValue} »</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{r.content}</p>
                     </div>
-                    <ModStatusBadge status={m.status} />
+                    {r.status === 'pending' ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30 flex-shrink-0">
+                        À répondre
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30 flex-shrink-0">
+                        Répondu
+                      </span>
+                    )}
                     <ArrowUpRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </button>
                 );

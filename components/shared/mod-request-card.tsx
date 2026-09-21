@@ -84,7 +84,7 @@ export function ModRequestCard({
           <Badge variant="outline" className={cn('flex-shrink-0', status.className)}>{status.label}</Badge>
         </div>
 
-        {/* ---- Champ ciblé ---- */}
+        {/* ---- Cible ---- */}
         <div className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground">Modification sur :</span>
           <span className="font-semibold text-foreground">{fieldLabel(mod.field) ?? mod.field}</span>
@@ -95,7 +95,7 @@ export function ModRequestCard({
           )}
         </div>
 
-        {/* ---- Avant -> après ---- */}
+        {/* ---- Contenu ---- */}
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
           <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
             <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Avant</p>

@@ -72,7 +72,7 @@ export default function ProjectDetailPage() {
   const projectId = params?.id as string;
   const project = projects.find((p) => p.id === projectId);
 
-  const [activeTab, setActiveTab] = useState<string>(initialTab && ['info', 'gantt', 'progress', 'calendar', 'tasks', 'team', 'modifications', 'mods_team'].includes(initialTab) ? initialTab : 'info');
+  const [activeTab, setActiveTab] = useState<string>(initialTab && ['info', 'gantt', 'progress', 'calendar', 'tasks', 'team', 'modifications'].includes(initialTab) ? initialTab : 'info');
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [revertOpen, setRevertOpen] = useState(false);
@@ -157,10 +157,9 @@ export default function ProjectDetailPage() {
   const isProjectMember = project.members.some((m) => m.userId === user.id);
   const isProjectOwner = user.role === 'client' && project.clientId === user.id;
   const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
-  const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
   const clientMods = project.modifications.filter((m) => getUser(users, m.requestedById)?.role === 'client');
   const teamMods = project.modifications.filter((m) => getUser(users, m.requestedById)?.role !== 'client');
-  const pendingTeamMods = teamMods.filter((m) => m.status === 'pending' || m.status === 'pending_client');
+  const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
   const reviewCount = project.subtasks.filter((st) => st.status === 'review').length;
   const availableEmployees = members.filter((e) => !project.members.some((m) => m.userId === e.id));
 
@@ -351,9 +350,9 @@ export default function ProjectDetailPage() {
       projectId: project.id, subtaskId, target, field: modReq.field,
       oldValue, newValue: modReq.newValue, reason: modReq.reason,
     });
-    setModReqOpen(false);
+setModReqOpen(false);
     setModReq({ target: 'project', subtaskId: '', field: 'description', newValue: '', reason: '' });
-    toast({ title: 'Demande envoyée', description: `Votre demande de modification (${modReq.field}) attend la validation.` });
+toast({ title: 'Demande envoyée', description: `Votre demande de modification (${modReq.field}) attend la validation.` });
   };
 
   const handleModificationRequestFromDetail = (subtaskId: string) => {
@@ -507,15 +506,6 @@ export default function ProjectDetailPage() {
             {pendingMods.length > 0 && (
               <span className="ml-1 inline-flex items-center justify-center h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-warning text-warning-foreground">
                 {pendingMods.length}
-              </span>
-            )}
-          </TabsTrigger>
-          {/* Modifications de l'équipe (validées par le client) */}
-          <TabsTrigger value="mods_team" className="gap-1.5">
-            <Users className="h-4 w-4" /> Modifs. équipe
-            {pendingTeamMods.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-info text-info-foreground">
-                {pendingTeamMods.length}
               </span>
             )}
           </TabsTrigger>
@@ -1221,7 +1211,7 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ---- Modifications tab (demandes du client, validées par l'admin / chef de projet) ---- */}
+        {/* ---- Modifications tab (demandes de changement, validées par l'admin / chef de projet) ---- */}
         <TabsContent value="modifications">
           <div>
             <div className="mb-5 rounded-xl border border-border bg-muted/20 overflow-hidden">
@@ -1231,11 +1221,11 @@ export default function ProjectDetailPage() {
                     <Edit3 className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold">Demandes de modification du client</h3>
+                    <h3 className="text-sm font-semibold">Demandes de modification</h3>
                     <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-                      Besoin d’un ajustement sur le projet (titre, description, délai, priorité, budget…) ou sur une sous-tâche ?
-                      Votre demande est examinée puis validée ou rejetée par l’admin / le chef de projet.
-                      Vous serez notifié(e) à chaque étape.
+                      Les changements proposés sur le projet (titre, description, délai, priorité, budget) ou sur une sous-tâche,
+                      soit par le client, soit par l&apos;équipe. Chaque demande est examinée puis validée ou rejetée
+                      par l&apos;admin / le chef de projet.
                     </p>
                   </div>
                 </div>
@@ -1248,94 +1238,70 @@ export default function ProjectDetailPage() {
               <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-background/50">
                 <span className="font-medium text-foreground">Comprendre les statuts :</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> En attente — pas encore examinée</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-info" /> Validation client — en attente de la validation du client</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Approuvée — le changement est appliqué</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Rejetée — un motif est indiqué</span>
               </div>
             </div>
 
-            {clientMods.length === 0 ? (
+            {project.modifications.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground">
                 <Edit3 className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Aucune demande de modification émise par le client.</p>
+                <p>Aucune demande de modification pour ce projet.</p>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {clientMods.map((mod) => (
-                  <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                    <ModRequestCard
-                      mod={mod}
-                      project={{ id: project.id, title: project.title }}
-                      requester={getUser(users, mod.requestedById)}
-                      reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
-                      users={users}
-                      fieldLabel={(f) => fieldLabels[f] ?? f}
-                      subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
-                      canApprove={canApproveMod(mod)}
-                      onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
-                      onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ---- Modifs. équipe tab (demandes de l'équipe, validées par le client) ---- */}
-        <TabsContent value="mods_team">
-          <div>
-            <div className="mb-5 rounded-xl border border-border bg-muted/20 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                    <Users className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">Demandes de modification de l&apos;équipe</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-                      Les changements proposés par l&apos;admin, le chef de projet ou les employés (titre, délai, priorité, budget, sous-tâche…).
-                      Approuvée par l&apos;équipe, chaque demande attend votre validation finale avant d&apos;être appliquée.
-                    </p>
-                  </div>
-                </div>
-                {project.status !== 'pending' && project.status !== 'rejected' && user.role !== 'client' && (
-                  <Button size="sm" onClick={() => setModReqOpen(true)} className="flex-shrink-0">
-                    <Plus className="h-4 w-4 mr-2" /> Nouvelle demande
-                  </Button>
+              <div className="space-y-6">
+                {teamMods.length > 0 && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-info flex-shrink-0" />
+                      <h4 className="text-sm font-semibold">Demandes de l&apos;équipe</h4>
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">admin · chef de projet · employé</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">({teamMods.length})</span>
+                    </div>
+                    {teamMods.map((mod) => (
+                      <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                        <ModRequestCard
+                          mod={mod}
+                          project={{ id: project.id, title: project.title }}
+                          requester={getUser(users, mod.requestedById)}
+                          reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
+                          users={users}
+                          fieldLabel={(f) => fieldLabels[f] ?? f}
+                          subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
+                          canApprove={canApproveMod(mod)}
+                          onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
+                          onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
+                        />
+                      </motion.div>
+                    ))}
+                  </section>
                 )}
-              </div>
-              <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-background/50">
-                <span className="font-medium text-foreground">Comprendre les statuts :</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> En attente — pas encore examinée</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-info" /> Validation client — approuvée par l’équipe, reste votre validation</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Approuvée — le changement est appliqué</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Rejetée — un motif est indiqué</span>
-              </div>
-            </div>
-
-            {teamMods.length === 0 ? (
-              <Card className="p-8 text-center text-muted-foreground">
-                <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Aucune demande de modification émise par l’équipe.</p>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {teamMods.map((mod) => (
-                  <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                    <ModRequestCard
-                      mod={mod}
-                      project={{ id: project.id, title: project.title }}
-                      requester={getUser(users, mod.requestedById)}
-                      reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
-                      users={users}
-                      fieldLabel={(f) => fieldLabels[f] ?? f}
-                      subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
-                      canApprove={canApproveMod(mod)}
-                      onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
-                      onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
-                    />
-                  </motion.div>
-                ))}
+                {clientMods.length > 0 && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 text-chart-5 flex-shrink-0" />
+                      <h4 className="text-sm font-semibold">Demandes du client</h4>
+                      <span className="text-xs text-muted-foreground tabular-nums">({clientMods.length})</span>
+                    </div>
+                    {clientMods.map((mod) => (
+                      <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                        <ModRequestCard
+                          mod={mod}
+                          project={{ id: project.id, title: project.title }}
+                          requester={getUser(users, mod.requestedById)}
+                          reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
+                          users={users}
+                          fieldLabel={(f) => fieldLabels[f] ?? f}
+                          subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
+                          canApprove={canApproveMod(mod)}
+                          onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
+                          onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
+                        />
+                      </motion.div>
+                    ))}
+                  </section>
+                )}
               </div>
             )}
           </div>
@@ -1830,7 +1796,6 @@ export default function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Task discussion dialog */}
       {/* Client meeting dialog */}
       <Dialog open={meetingOpen} onOpenChange={setMeetingOpen}>
         <DialogContent className="max-w-md">

@@ -7,6 +7,7 @@ import {
   Bell, CheckCheck, FolderKanban, CheckCircle2, XCircle, CheckSquare,
   AlarmClock, PartyPopper, Pencil, SearchCheck, UserPlus, BadgeCheck, User, CalendarPlus,
   MessageSquare, Paperclip, SlidersHorizontal, Undo2, Inbox, ClipboardCheck,
+  MessageSquareQuote, Send,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -40,6 +41,8 @@ const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; colo
   task_requested: { icon: Inbox, color: 'text-warning bg-warning/10' },
   task_request_approved: { icon: ClipboardCheck, color: 'text-info bg-info/10' },
   task_request_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
+  requete_created: { icon: MessageSquareQuote, color: 'text-info bg-info/10' },
+  requete_answered: { icon: Send, color: 'text-success bg-success/10' },
   account_created: { icon: Inbox, color: 'text-warning bg-warning/10' },
   account_validated: { icon: BadgeCheck, color: 'text-success bg-success/10' },
   account_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },

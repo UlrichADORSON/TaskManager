@@ -31,6 +31,8 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   task_requested: '📥',
   task_request_approved: '✅',
   task_request_rejected: '❌',
+  requete_created: '✉️',
+  requete_answered: '📨',
   account_created: '🆕',
   account_validated: '✅',
   account_rejected: '⛔',

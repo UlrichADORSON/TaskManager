@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, FolderKanban, Users, CheckSquare,
-  FileText, Settings, LogOut, ChevronLeft, Layers, Bell, UserCog, History,
+  FileText, Settings, LogOut, ChevronLeft, Layers, Bell, UserCog, History, MessageSquareQuote,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { label: 'Projets',      href: '/projects',      icon: FolderKanban,    roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Historique',   href: '/history',       icon: History,         roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Tâches',      href: '/tasks',         icon: CheckSquare,     roles: ['admin', 'chef_de_projet', 'membre'] },
+  { label: 'Requêtes',    href: '/requetes',       icon: MessageSquareQuote, roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Équipe',       href: '/employees',     icon: Users,           roles: ['admin', 'chef_de_projet', 'membre'] },
   { label: 'Soumettre',    href: '/submit',        icon: FileText,        roles: ['client', 'admin'] },
   { label: 'Notifications',href: '/notifications', icon: Bell,            roles: ['admin', 'chef_de_projet', 'membre', 'client'] },

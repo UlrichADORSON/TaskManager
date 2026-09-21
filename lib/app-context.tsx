@@ -5,6 +5,7 @@ import type {
   User, Project, AppNotification, Subtask, SubtaskStatus,
   ProjectStatus, Attachment, ModificationRequest, ModificationStatus,
   ModificationTarget, Role, MemberSpecialty, CalendarEvent, ProjectVersion, TaskRequest, Priority,
+  Requete, RequeteStatus, RequeteResponse,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
 
@@ -72,6 +73,8 @@ interface AppState {
   reviewModification: (projectId: string, modificationId: string, decision: 'approved' | 'rejected', note: string) => void;
   requestTask: (projectId: string, data: RequestTaskData) => void;
   reviewTaskRequest: (projectId: string, requestId: string, decision: 'approved' | 'rejected', note: string) => void;
+  submitRequete: (projectId: string, data: { subtaskId?: string | null; content: string }) => void;
+  answerRequete: (projectId: string, requeteId: string, data: { text: string; attachment?: Attachment | null }) => void;
   addSubtaskComment: (projectId: string, subtaskId: string, content: string) => void;
   addSubtaskAttachment: (projectId: string, subtaskId: string, attachment: Attachment) => void;
   validateSubtaskAttachment: (projectId: string, subtaskId: string, attachmentId: string, action: 'approve' | 'reject') => void;
@@ -264,6 +267,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       calendarEvents: [],
       modifications: [],
       taskRequests: [],
+      requetes: [],
       platformUsers: data.platformUsers,
       desiredFeatures: data.desiredFeatures,
       necessaryPages: data.necessaryPages,
@@ -803,6 +807,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [currentUser, projects]);
 
+  // ---- Requêtes (l'équipe demande au client une photo / un fichier / une information)
+  const submitRequete: AppState['submitRequete'] = useCallback((projectId, data) => {
+    if (!currentUser || currentUser.role === 'client' || !data.content.trim()) return;
+    const proj = projects.find((p) => p.id === projectId);
+    if (!proj) return;
+    const requete: Requete = {
+      id: `rq-${Date.now()}`,
+      projectId,
+      subtaskId: data.subtaskId || null,
+      createdById: currentUser.id,
+      createdByName: currentUser.name,
+      content: data.content.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      respondedAt: null,
+      response: null,
+    };
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId ? { ...p, requetes: [requete, ...p.requetes] } : p
+    ));
+    pushNotification(setNotifications, {
+      userId: proj.clientId,
+      type: 'requete_created',
+      title: 'Nouvelle requête',
+      message: `${currentUser.name} vous demande : « ${requete.content} » (projet « ${proj.title} »).`,
+      projectId,
+    });
+  }, [currentUser, projects]);
+
+  const answerRequete: AppState['answerRequete'] = useCallback((projectId, requeteId, data) => {
+    if (!currentUser || currentUser.role !== 'client') return;
+    const proj = projects.find((p) => p.id === projectId);
+    const requete = proj?.requetes.find((r) => r.id === requeteId);
+    if (!proj || !requete || requete.status !== 'pending' || proj.clientId !== currentUser.id) return;
+    const at = new Date().toISOString();
+    const response: RequeteResponse = {
+      text: data.text.trim(),
+      ...(data.attachment
+        ? {
+            attachmentUrl: data.attachment.url,
+            attachmentName: data.attachment.fileName,
+            attachmentType: data.attachment.fileType,
+          }
+        : {}),
+      at,
+    };
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            requetes: p.requetes.map((r) =>
+              r.id === requeteId
+                ? { ...r, status: 'answered' as RequeteStatus, respondedAt: at, response }
+                : r
+            ),
+          }
+        : p
+    ));
+    pushNotification(setNotifications, {
+      userId: requete.createdById,
+      type: 'requete_answered',
+      title: 'Requête répondue',
+      message: `Le client a répondu à votre requête sur « ${proj.title} »${data.text ? ` : « ${data.text} »` : ''}.`,
+      projectId,
+    });
+  }, [currentUser, projects]);
+
   // ---- Task comments
   const addSubtaskComment: AppState['addSubtaskComment'] = useCallback((projectId, subtaskId, content) => {
     if (!currentUser || !content.trim()) return;
@@ -1072,6 +1143,7 @@ submitProject, validateProject, revertProjectValidation, rejectProject, assignMa
     addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
 suggestModification, reviewModification,
        requestTask, reviewTaskRequest,
+    submitRequete, answerRequete,
     addSubtaskComment,
     addSubtaskAttachment,
     validateSubtaskAttachment,
@@ -1088,6 +1160,7 @@ submitProject, validateProject, revertProjectValidation, rejectProject, assignMa
        addSubtask, updateSubtaskStatus, approveSubtask, assignSubtask, toggleTaskActive,
 suggestModification, reviewModification,
     requestTask, reviewTaskRequest,
+    submitRequete, answerRequete,
        addSubtaskComment,
        addSubtaskAttachment,
        validateSubtaskAttachment,

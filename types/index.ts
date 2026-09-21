@@ -133,6 +133,30 @@ export interface TaskRequest {
   createdAt: string;
 }
 
+// ------------------------------------ Requête (the team asks the client for a photo / file / info)
+export type RequeteStatus = 'pending' | 'answered';
+
+export interface RequeteResponse {
+  text: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  at: string;
+}
+
+export interface Requete {
+  id: string;
+  projectId: string;
+  subtaskId: string | null;       // optional — requête linked to a specific subtask
+  createdById: string;
+  createdByName: string;
+  content: string;                // what is asked from the client
+  status: RequeteStatus;
+  createdAt: string;
+  respondedAt: string | null;
+  response: RequeteResponse | null;
+}
+
 // ------------------------------------ Progress timeline point (for the curve chart)
 export interface ProgressPoint {
   date: string;          // ISO date
@@ -195,6 +219,7 @@ export interface Project {
   calendarEvents: CalendarEvent[];
   modifications: ModificationRequest[];
   taskRequests: TaskRequest[];
+  requetes: Requete[];
   // Submission detail fields
   platformUsers?: string;      // utilisateurs de la plateforme
   desiredFeatures?: string;    // fonctionnalités souhaitées
@@ -218,6 +243,7 @@ export interface AppNotification {
       | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event'
       | 'task_comment' | 'project_attachment'
       | 'task_requested' | 'task_request_approved' | 'task_request_rejected'
+      | 'requete_created' | 'requete_answered'
       | 'account_created' | 'account_validated' | 'account_rejected';
   title: string;
   message: string;
