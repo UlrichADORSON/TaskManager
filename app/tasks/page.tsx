@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 import {
   CheckSquare, Calendar, Paperclip, Edit3,
-  AlertCircle, MessageSquare, Play, Pause, Timer,
+  AlertCircle, MessageSquare, Play, Pause, Timer, Ban, Layers,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { subtaskStatusMeta, formatDate, daysUntil } from '@/lib/status';
+import { cn } from '@/lib/utils';
 import type { SubtaskStatus, WorkSession } from '@/types';
 
 function formatWorkTime(totalSeconds: number): string {
@@ -45,6 +46,8 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [scope, setScope] = useState<'mine' | 'all'>('mine');
+  const [cancelTarget, setCancelTarget] = useState<{ projectId: string; id: string; title: string } | null>(null);
   const [modDialogOpen, setModDialogOpen] = useState(false);
   const [modTarget, setModTarget] = useState<{ projectId: string; subtaskId: string; title: string; field: string; oldValue: string } | null>(null);
   const [modForm, setModForm] = useState({ field: 'description', newValue: '', reason: '' });
@@ -65,18 +68,28 @@ export default function TasksPage() {
     return closed + runningSecs;
   };
 
-  const myTasks = useMemo(() => {
+  const tasks = useMemo(() => {
     if (!user) return [];
-    let tasks = projects.flatMap((p) =>
+    const isManager = user.role === 'admin' || user.role === 'chef_de_projet';
+    const effectiveScope = isManager ? scope : 'mine';
+    let list = projects.flatMap((p) =>
       p.subtasks
-        .filter((st) => st.assignedToId === user.id)
+        .filter((st) => effectiveScope === 'all' || st.assignedToId === user.id)
         .map((st) => ({ ...st, projectTitle: p.title, projectId: p.id }))
     );
-    if (statusFilter !== 'all') tasks = tasks.filter((t) => t.status === statusFilter);
-    if (priorityFilter !== 'all') tasks = tasks.filter((t) => t.priority === priorityFilter);
-    if (search) tasks = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
-    return tasks;
-  }, [user, projects, statusFilter, priorityFilter, search]);
+    if (statusFilter !== 'all') list = list.filter((t) => t.status === statusFilter);
+    if (priorityFilter !== 'all') list = list.filter((t) => t.priority === priorityFilter);
+    if (search) list = list.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
+    return list;
+  }, [user, projects, statusFilter, priorityFilter, search, scope]);
+
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = { all: tasks.length };
+    (Object.keys(subtaskStatusMeta) as SubtaskStatus[]).forEach((k) => {
+      c[k] = tasks.filter((t) => t.status === k).length;
+    });
+    return c;
+  }, [tasks]);
 
   if (!user) return null;
 
@@ -84,10 +97,12 @@ export default function TasksPage() {
 
   const availableStatuses = (status: SubtaskStatus): SubtaskStatus[] => {
     let options: SubtaskStatus[];
-    if (status === 'review') options = ['todo', 'in_progress', 'review'];
+    if (status === 'review') options = ['todo', 'in_progress', 'review', 'cancelled'];
     else if (status === 'done') options = ['done'];
-    else options = ['todo', 'in_progress', 'review'];
+    else if (status === 'cancelled') options = ['todo', 'cancelled'];
+    else options = ['todo', 'in_progress', 'review', 'cancelled'];
     if (!canValidate) options = options.filter((s) => s !== 'done');
+    if (!canValidate) options = options.filter((s) => s !== 'cancelled');
     return options;
   };
 
@@ -129,11 +144,66 @@ export default function TasksPage() {
   return (
     <AppShell>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Mes tâches assignées</h2>
+        <h2 className="font-display text-2xl font-bold tracking-tight mb-2">
+          {canValidate && scope === 'all' ? 'Toutes les tâches' : 'Mes tâches assignées'}
+        </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Consultez vos tâches et suivez leur progression. Vous pouvez suggérer des modifications qui seront examinées par un chef de projet ou l’admin.
+          {canValidate
+            ? 'Vue d’ensemble des tâches de tous les projets — terminez d’en cours à terminé, ou annulez une tâche devenue inutile.'
+            : 'Consultez vos tâches et suivez leur progression. Vous pouvez suggérer des modifications qui seront examinées par un chef de projet ou l’admin.'}
         </p>
       </motion.div>
+
+      {canValidate && (
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 w-fit mb-4">
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all',
+              scope === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Layers className="h-3.5 w-3.5" /> Globales
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('mine')}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all',
+              scope === 'mine' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <CheckSquare className="h-3.5 w-3.5" /> Mes tâches
+          </button>
+        </div>
+      )}
+
+      {/* Statut : terminé / en cours / annulé … */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(['all', 'todo', 'in_progress', 'review', 'done', 'cancelled'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setStatusFilter(k)}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-all duration-200 active:scale-[0.98]',
+              statusFilter === k
+                ? 'border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+            )}
+          >
+            <span className={cn('h-2 w-2 rounded-full', k === 'all' ? 'bg-muted-foreground' : subtaskStatusMeta[k].dot)} />
+            {k === 'all' ? 'Tout' : subtaskStatusMeta[k].label}
+            <span className={cn(
+              'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+              statusFilter === k ? 'bg-white/15 text-white' : 'bg-muted text-muted-foreground'
+            )}>
+              {statusCounts[k]}
+            </span>
+          </button>
+        ))}
+      </div>
 
       <FilterBar
         search={search}
@@ -160,18 +230,19 @@ export default function TasksPage() {
         ]}
       />
 
-      {myTasks.length === 0 ? (
+      {tasks.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <CheckSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>Aucune tâche assignée pour le moment.</p>
+          <p>Aucune tâche à afficher pour le moment.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <AnimatePresence mode="popLayout">
-            {myTasks.map((task, i) => {
+            {tasks.map((task, i) => {
               const daysLeft = daysUntil(task.dueDate);
-              const isLate = daysLeft < 0 && task.status !== 'done';
+              const isLate = daysLeft < 0 && task.status !== 'done' && task.status !== 'cancelled';
               const isDone = task.status === 'done';
+              const isCancelled = task.status === 'cancelled';
               return (
                 <motion.div
                   key={task.id}
@@ -181,7 +252,7 @@ export default function TasksPage() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3) }}
                 >
-                  <Card className={`p-5 hover:shadow-lg transition-all`}>
+                  <Card className={`p-5 hover:shadow-lg transition-all ${isCancelled ? 'opacity-70' : ''}`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
                         <button onClick={() => router.push(`/projects/${task.projectId}`)} className="font-semibold text-sm hover:text-primary transition-colors text-left">
@@ -197,7 +268,7 @@ export default function TasksPage() {
                     <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatDate(task.dueDate)}</span>
                       <span className={isLate ? 'text-destructive font-medium' : ''}>
-                        {isDone ? 'Terminé' : isLate ? `En retard de ${Math.abs(daysLeft)} j` : daysLeft > 0 ? `${daysLeft} j restants` : "Aujourd'hui"}
+                        {isDone ? 'Terminé' : isCancelled ? 'Annulé' : isLate ? `En retard de ${Math.abs(daysLeft)} j` : daysLeft > 0 ? `${daysLeft} j restants` : "Aujourd'hui"}
                       </span>
                       {task.attachments.length > 0 && (
                         <span className="flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" />{task.attachments.length}</span>
@@ -208,9 +279,9 @@ export default function TasksPage() {
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs text-muted-foreground">Progression</span>
-                        <span className="text-xs font-bold">{task.progress}%</span>
+                        <span className="text-xs font-bold">{isCancelled ? '—' : `${task.progress}%`}</span>
                       </div>
-                      <ProgressBar value={task.progress} indicatorClassName={task.progress < 33 ? 'bg-destructive' : task.progress < 66 ? 'bg-warning' : 'bg-success'} />
+                      {!isCancelled && <ProgressBar value={task.progress} indicatorClassName={task.progress < 33 ? 'bg-destructive' : task.progress < 66 ? 'bg-warning' : 'bg-success'} />}
                       <div className={`mt-2 flex items-center gap-1.5 text-xs text-muted-foreground ${task.isActive ? 'text-primary' : ''}`}>
                         <Timer className={`h-3.5 w-3.5 ${task.isActive ? 'animate-pulse' : ''}`} />
                         <span>Temps de travail : <span className="font-medium">{formatWorkTime(taskWorkSeconds(task))}</span></span>
@@ -220,8 +291,7 @@ export default function TasksPage() {
                     <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
                       <SubtaskStatusBadge status={task.status} />
 
-                      {/* Pause / resume working session */}
-                      {!isDone && (
+                      {!isDone && !isCancelled && (
                         <Button
                           size="sm"
                           variant={task.isActive ? 'destructive' : 'default'}
@@ -243,7 +313,7 @@ export default function TasksPage() {
                       </Button>
 
                       {/* Suggest modification button */}
-                      {!isDone && (
+                      {!isDone && !isCancelled && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -251,6 +321,18 @@ export default function TasksPage() {
                           onClick={() => openModDialog(task)}
                         >
                           <Edit3 className="h-3.5 w-3.5" /> Suggérer modif.
+                        </Button>
+                      )}
+
+                      {/* Cancel task (manager only) */}
+                      {canValidate && !isDone && !isCancelled && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs gap-1.5 text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setCancelTarget({ projectId: task.projectId, id: task.id, title: task.title })}
+                        >
+                          <Ban className="h-3.5 w-3.5" /> Annuler
                         </Button>
                       )}
 
@@ -336,6 +418,40 @@ export default function TasksPage() {
             <Button variant="outline" onClick={() => setModDialogOpen(false)}>Annuler</Button>
             <Button onClick={handleSubmitModification} disabled={!modForm.newValue || !modForm.reason}>
               Soumettre la suggestion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel task dialog */}
+      <Dialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-destructive" /> Annuler la tâche ?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-muted-foreground">
+              <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+              <p>
+                « <strong className="text-foreground">{cancelTarget?.title}</strong> » sera marquée comme <strong className="text-foreground">annulée</strong>
+                et ne sera plus comptée dans la progression du projet.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Confirmez-vous l&apos;annulation de cette tâche ?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Non, garder</Button>
+            <Button variant="destructive" onClick={() => {
+              if (!cancelTarget) return;
+              updateSubtaskStatus(cancelTarget.projectId, cancelTarget.id, 'cancelled');
+              toast({ title: 'Tâche annulée', description: `« ${cancelTarget.title} » a été annulée.` });
+              setCancelTarget(null);
+            }}>
+              <Ban className="h-4 w-4 mr-2" /> Oui, annuler
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import * as df from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarDays, ChevronLeft, ChevronRight, ListTodo } from 'lucide-react';
@@ -45,11 +45,23 @@ interface ProjectCalendarProps {
   events: CalendarEvent[];
   subtasks: Subtask[];
   className?: string;
+  focus?: { id: string; date: string } | null;
 }
 
-export function ProjectCalendar({ events, subtasks, className }: ProjectCalendarProps) {
+export function ProjectCalendar({ events, subtasks, className, focus }: ProjectCalendarProps) {
   const [month, setMonth] = useState(() => df.startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Quand on clique sur un événement / une sous-tâche ailleurs : aller à sa date
+  useEffect(() => {
+    if (!focus) return;
+    const date = df.parseISO(focus.date);
+    if (!df.isValid(date)) return;
+    setMonth(df.startOfMonth(date));
+    setSelectedDate(date);
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus]);
 
   const days = useMemo(
     () =>
@@ -122,7 +134,7 @@ export function ProjectCalendar({ events, subtasks, className }: ProjectCalendar
 
   return (
     <>
-      <div className={cn('bg-card border border-border/40 rounded-2xl p-4 sm:p-5 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.12)]', className)}>
+      <div ref={containerRef} className={cn('bg-card border border-border/40 rounded-2xl p-4 sm:p-5 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.12)] scroll-mt-24', className)}>
         {/* En-tête */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-1.5">

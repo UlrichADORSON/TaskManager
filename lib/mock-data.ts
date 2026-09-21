@@ -372,7 +372,7 @@ export const mockProjects: Project[] = [
       { id: 'mod-2', projectId: 'p-1', subtaskId: 'st-1-4', target: 'subtask', requestedById: 'u-emp-3', requestedByName: 'Marco Rossi', field: 'description', oldValue: 'Créer l\'API REST (Laravel) et la base de données MySQL.', newValue: 'Créer l\'API REST (Laravel), la base de données MySQL et intégrer un système de cache Redis pour optimiser les performances.', reason: 'Les temps de réponse sur la gestion du catalogue dépassent les 2 secondes. Ajouter Redis améliorerait drastiquement les performances.', status: 'approved', reviewedById: 'u-admin-1', reviewNote: 'Demande justifiée, le cache Redis est une excellente idée pour les performances.', createdAt: '2026-08-28T14:00:00Z', reviewedAt: '2026-08-29T09:00:00Z' },
     ],
     taskRequests: [
-      { id: 'tr-1', projectId: 'p-1', clientId: 'u-cli-1', title: 'Ajouter une page FAQ', description: 'Ajouter une page FAQ responsive accessible depuis le pied de page du site, avec 8 questions/réponses pré-remplies.', priority: 'low', status: 'pending', reviewedById: null, reviewedAt: null, reviewNote: '', createdAt: '2026-09-14T09:00:00Z' },
+      { id: 'tr-1', projectId: 'p-1', clientId: 'u-cli-1', title: 'Ajouter une page FAQ', description: 'Ajouter une page FAQ responsive accessible depuis le pied de page du site, avec 8 questions/réponses pré-remplies.', priority: 'low', besoinDate: '2026-09-22T00:00:00Z', photoUrl: null, photoName: null, status: 'pending', reviewedById: null, reviewedAt: null, reviewNote: '', createdAt: '2026-09-14T09:00:00Z' },
     ],
     clientMeeting: { date: '2026-06-10T10:00:00Z', note: 'Rapport de cadrage validé avec les 6 pages et le paiement Stripe.' },
     createdAt: '2026-05-20T08:00:00Z',
@@ -409,7 +409,7 @@ export const mockProjects: Project[] = [
       { id: 'mod-3', projectId: 'p-2', subtaskId: 'st-2-3', target: 'subtask', requestedById: 'u-emp-1', requestedByName: 'Thomas Dubois', field: 'title', oldValue: 'Intégration nouvelle UI', newValue: 'Intégration nouvelle UI + migration composants legacy', reason: 'L\'ancien site contient plus de composants legacy que prévu. Le titre devrait refléter le périmètre réel.', status: 'rejected', reviewedById: 'u-admin-1', reviewNote: 'Le changement de titre n\'est pas nécessaire. La description suffit à clarifier le périmètre.', createdAt: '2026-08-15T11:00:00Z', reviewedAt: '2026-08-16T08:00:00Z' },
     ],
     taskRequests: [
-      { id: 'tr-2', projectId: 'p-2', clientId: 'u-cli-2', title: 'Ajouter un formulaire de devis', description: 'Formulaire de devis en ligne (nom, email, descriptif du projet) avec envoi par email.', priority: 'medium', status: 'approved', reviewedById: 'u-admin-1', reviewedAt: '2026-08-20T10:00:00Z', reviewNote: 'Approuvé — une sous-tâche a été ajoutée au projet.', createdAt: '2026-08-19T09:00:00Z' },
+      { id: 'tr-2', projectId: 'p-2', clientId: 'u-cli-2', title: 'Ajouter un formulaire de devis', description: 'Formulaire de devis en ligne (nom, email, descriptif du projet) avec envoi par email.', priority: 'medium', besoinDate: '2026-08-25T00:00:00Z', photoUrl: null, photoName: null, status: 'approved', reviewedById: 'u-admin-1', reviewedAt: '2026-08-20T10:00:00Z', reviewNote: 'Approuvé — une sous-tâche a été ajoutée au projet.', createdAt: '2026-08-19T09:00:00Z' },
     ],
     clientMeeting: null,
     createdAt: '2026-06-25T08:00:00Z',

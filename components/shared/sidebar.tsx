@@ -22,9 +22,9 @@ const navItems: NavItem[] = [
   { label: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Projets',      href: '/projects',      icon: FolderKanban,    roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
   { label: 'Historique',   href: '/history',       icon: History,         roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
-  { label: 'Mes tâches',   href: '/tasks',         icon: CheckSquare,     roles: ['membre'] },
+  { label: 'Tâches',      href: '/tasks',         icon: CheckSquare,     roles: ['admin', 'chef_de_projet', 'membre'] },
   { label: 'Équipe',       href: '/employees',     icon: Users,           roles: ['admin', 'chef_de_projet', 'membre'] },
-  { label: 'Soumettre',    href: '/submit',        icon: FileText,        roles: ['client'] },
+  { label: 'Soumettre',    href: '/submit',        icon: FileText,        roles: ['client', 'admin'] },
   { label: 'Notifications',href: '/notifications', icon: Bell,            roles: ['admin', 'chef_de_projet', 'membre', 'client'] },
 ];
 

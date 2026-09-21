@@ -40,6 +40,9 @@ const notificationMeta: Record<AppNotification['type'], { icon: LucideIcon; colo
   task_requested: { icon: Inbox, color: 'text-warning bg-warning/10' },
   task_request_approved: { icon: ClipboardCheck, color: 'text-info bg-info/10' },
   task_request_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
+  account_created: { icon: Inbox, color: 'text-warning bg-warning/10' },
+  account_validated: { icon: BadgeCheck, color: 'text-success bg-success/10' },
+  account_rejected: { icon: XCircle, color: 'text-destructive bg-destructive/10' },
 };
 
 const notificationFilters: { value: AppNotification['type'] | 'all'; label: string }[] = [

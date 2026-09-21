@@ -27,6 +27,7 @@ const columns: KanbanColumn[] = [
   { id: 'in_progress', label: 'En cours', color: 'text-primary', bgColor: 'bg-primary/5', dotColor: 'bg-primary' },
   { id: 'review', label: 'En revue', color: 'text-chart-5', bgColor: 'bg-chart-5/5', dotColor: 'bg-chart-5' },
   { id: 'done', label: 'Terminé', color: 'text-success', bgColor: 'bg-success/5', dotColor: 'bg-success' },
+  { id: 'cancelled', label: 'Annulé', color: 'text-destructive', bgColor: 'bg-destructive/5', dotColor: 'bg-destructive' },
 ];
 
 interface KanbanBoardProps {
@@ -59,12 +60,13 @@ export function KanbanBoard({
       case 'in_progress': return 'review';
       case 'review': return 'done';
       case 'done': return null;
+      case 'cancelled': return null;
       default: return null;
     }
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-start">
       {columns.map((col) => {
         const tasks = getColumnTasks(col.id);
         return (
@@ -229,17 +231,19 @@ function KanbanCard({
       <div className="mb-3">
         <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
           <span>Progression</span>
-          <span className="font-medium">{task.progress}%</span>
+          <span className="font-medium">{task.status === 'cancelled' ? '—' : `${task.progress}%`}</span>
         </div>
-        <ProgressBar
-          value={task.progress}
-          indicatorClassName={task.progress < 33 ? 'bg-destructive' : task.progress < 66 ? 'bg-warning' : 'bg-success'}
-          className="h-1.5"
-        />
+        {task.status !== 'cancelled' && (
+          <ProgressBar
+            value={task.progress}
+            indicatorClassName={task.progress < 33 ? 'bg-destructive' : task.progress < 66 ? 'bg-warning' : 'bg-success'}
+            className="h-1.5"
+          />
+        )}
       </div>
 
       {/* Deliverables */}
-      {deliverables.length > 0 && (
+      {task.status !== 'cancelled' && deliverables.length > 0 && (
         <div className="mb-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5">Livrables</p>
           <div className="flex flex-wrap gap-1.5">

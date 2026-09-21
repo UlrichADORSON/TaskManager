@@ -38,6 +38,9 @@ interface RequestTaskData {
   title: string;
   description: string;
   priority: Priority;
+  besoinDate?: string | null;
+  photoUrl?: string | null;
+  photoName?: string | null;
 }
 
 interface AppState {
@@ -75,7 +78,10 @@ interface AppState {
   addProjectAttachment: (projectId: string, attachment: Attachment) => void;
   updateSubtaskProgress: (projectId: string, subtaskId: string, progress: number) => void;
   scheduleClientMeeting: (projectId: string, data: { date: string; note: string }) => void;
-  addEmployee: (data: { name: string; email: string; password: string; phone: string; role: 'chef_de_projet' | 'membre'; memberSpecialty?: MemberSpecialty; avatarUrl?: string; company?: string; address?: string; bio?: string }) => void;
+  addEmployee: (data: { name: string; email: string; password: string; phone: string; role: 'admin' | 'chef_de_projet' | 'membre'; memberSpecialty?: MemberSpecialty; avatarUrl?: string; company?: string; address?: string; bio?: string }) => void;
+  register: (data: { name: string; email: string; password: string; phone?: string; role: 'client' | 'chef_de_projet' | 'membre'; company?: string; memberSpecialty?: MemberSpecialty; bio?: string }) => void;
+  reviewAccount: (userId: string, decision: 'approved' | 'rejected') => void;
+  resetPassword: (email: string, newPassword: string) => boolean;
   updateUser: (userId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; role?: Role; memberSpecialty?: MemberSpecialty; password?: string; avatarUrl?: string }) => void;
   updateProfile: (data: { name?: string; email?: string; phone?: string; company?: string; address?: string; bio?: string; memberSpecialty?: MemberSpecialty; avatarUrl?: string }) => void;
   markNotificationRead: (id: string) => void;
@@ -207,6 +213,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
     );
     if (!user) return false;
+    if (user.accountStatus === 'pending' || user.accountStatus === 'rejected') return false;
     setCurrentUser(user);
     setActiveUserIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
     setUsers((prev) => prev.map((u) =>
@@ -235,12 +242,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Project actions
   const submitProject: AppState['submitProject'] = useCallback((data) => {
+    const submittedByAdmin = currentUser?.role === 'admin';
     const newProject: Project = {
       id: `p-${Date.now()}`,
       title: data.title,
       description: data.description,
       clientId: currentUser?.id ?? 'u-cli-1',
-      status: 'pending',
+      status: submittedByAdmin ? 'validated' : 'pending',
       priority: data.priority,
       managerId: null,
       startDate: data.startDate,
@@ -264,10 +272,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setProjects((prev) => [newProject, ...prev]);
-    setNotifications((prev) => [
-      { id: `n-${Date.now()}`, userId: 'u-admin-1', type: 'project_submitted', title: 'Nouveau projet soumis', message: `« ${data.title} » attend validation.`, projectId: newProject.id, read: false, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
+    if (!submittedByAdmin) {
+      setNotifications((prev) => [
+        { id: `n-${Date.now()}`, userId: 'u-admin-1', type: 'project_submitted', title: 'Nouveau projet soumis', message: `« ${data.title} » attend validation.`, projectId: newProject.id, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
+    }
   }, [currentUser]);
 
   const validateProject: AppState['validateProject'] = useCallback((projectId) => {
@@ -394,14 +404,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
-        ? {
-            ...p,
-            status: p.status === 'assigned' ? ('in_progress' as ProjectStatus) : p.status,
-            subtasks: [...p.subtasks, newSubtask],
-            members: data.assignedToId && !p.members.some((m) => m.userId === data.assignedToId)
-              ? [...p.members, { userId: data.assignedToId, role: 'membre' as const, joinedAt: new Date().toISOString() }]
-              : p.members,
-          }
+        ? (() => {
+            const subtasks = [...p.subtasks, newSubtask];
+            const totalProgress = subtasks.length > 0
+              ? Math.round(subtasks.filter((st) => st.status !== 'cancelled').reduce((acc, st) => acc + st.progress, 0) / subtasks.filter((st) => st.status !== 'cancelled').length)
+              : 0;
+            return {
+              ...p,
+              status: p.status === 'assigned' ? ('in_progress' as ProjectStatus) : p.status,
+              subtasks,
+              members: data.assignedToId && !p.members.some((m) => m.userId === data.assignedToId)
+                ? [...p.members, { userId: data.assignedToId, role: 'membre' as const, joinedAt: new Date().toISOString() }]
+                : p.members,
+              progress: totalProgress,
+            };
+          })()
         : p
     ));
     if (data.assignedToId) {
@@ -434,8 +451,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return next;
       });
-      const totalProgress = updatedSubtasks.length > 0
-        ? Math.round(updatedSubtasks.reduce((acc, st) => acc + st.progress, 0) / updatedSubtasks.length)
+      const active = updatedSubtasks.filter((st) => st.status !== 'cancelled');
+      const totalProgress = active.length > 0
+        ? Math.round(active.reduce((acc, st) => acc + st.progress, 0) / active.length)
         : 0;
       const isCompleted = updatedSubtasks.length > 0 && updatedSubtasks.every((st) => st.status === 'done');
       return {
@@ -466,8 +484,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? { ...st, status: 'done' as SubtaskStatus, progress: 100 }
           : st
       );
-      const totalProgress = updatedSubtasks.length > 0
-        ? Math.round(updatedSubtasks.reduce((acc, st) => acc + st.progress, 0) / updatedSubtasks.length)
+      const active = updatedSubtasks.filter((st) => st.status !== 'cancelled');
+      const totalProgress = active.length > 0
+        ? Math.round(active.reduce((acc, st) => acc + st.progress, 0) / active.length)
         : 0;
       const isCompleted = updatedSubtasks.length > 0 && updatedSubtasks.every((st) => st.status === 'done');
       return {
@@ -703,6 +722,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: data.title.trim(),
       description: data.description.trim(),
       priority: data.priority,
+      besoinDate: data.besoinDate || null,
+      photoUrl: data.photoUrl || null,
+      photoName: data.photoName || null,
       status: 'pending',
       reviewedById: null,
       reviewedAt: null,
@@ -722,7 +744,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser, projects]);
 
   const reviewTaskRequest: AppState['reviewTaskRequest'] = useCallback((projectId, requestId, decision, note) => {
-    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'chef_de_projet')) return;
     const proj = projects.find((p) => p.id === projectId);
     const req = proj?.taskRequests.find((r) => r.id === requestId);
     if (!proj || !req || req.status !== 'pending') return;
@@ -733,6 +755,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let subtasks = p.subtasks;
       let projPatch: Partial<typeof p> = {};
       if (decision === 'approved') {
+        const requestedEnd = req.besoinDate ? new Date(req.besoinDate).getTime() : 0;
+        const projectEnd = new Date(p.endDate).getTime();
+        const dueDate = req.besoinDate && requestedEnd < projectEnd
+          ? new Date(req.besoinDate).toISOString()
+          : p.endDate;
         const newSubtask: Subtask = {
           id: `st-${Date.now()}`,
           projectId,
@@ -743,7 +770,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           assignedToId: null,
           dependsOnId: null,
           startDate: new Date().toISOString(),
-          dueDate: p.endDate,
+          dueDate,
           progress: 0,
           attachments: [],
           comments: [],
@@ -754,12 +781,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         subtasks = [...p.subtasks, newSubtask];
         projPatch = { status: p.status === 'assigned' ? ('in_progress' as ProjectStatus) : p.status };
       }
+      const active = subtasks.filter((st) => st.status !== 'cancelled');
+      const totalProgress = active.length > 0
+        ? Math.round(active.reduce((acc, st) => acc + st.progress, 0) / active.length)
+        : 0;
       const taskRequests = p.taskRequests.map((r) =>
         r.id === requestId
           ? { ...r, status: decision, reviewedById: currentUser.id, reviewedAt, reviewNote: note }
           : r
       );
-      return { ...p, ...projPatch, taskRequests, subtasks };
+      return { ...p, ...projPatch, taskRequests, subtasks, progress: totalProgress };
     }));
     pushNotification(setNotifications, {
       userId: proj.clientId,
@@ -953,6 +984,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUsers((prev) => [...prev, newUser]);
   }, []);
 
+  // Public self-registration (client = immediate, employee = pending admin approval)
+  const register: AppState['register'] = useCallback((data) => {
+    const needsApproval = data.role !== 'client';
+    const newUserMeta: User = {
+      id: `u-${Date.now()}`,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      memberSpecialty: data.memberSpecialty,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=b6e3f4`,
+      password: data.password,
+      phone: data.phone ?? '',
+      company: data.company,
+      bio: data.bio,
+      accountStatus: needsApproval ? 'pending' : 'active',
+      createdAt: new Date().toISOString(),
+    };
+    setUsers((prev) => [...prev, newUserMeta]);
+    if (needsApproval) {
+      setNotifications((prev) => [
+        { id: `n-${Date.now()}`, userId: 'u-admin-1', type: 'account_created', title: 'Nouveau compte employé', message: `« ${data.name} » a créé un compte ${data.role === 'chef_de_projet' ? 'chef de projet' : 'membre'}. À valider.`, read: false, createdAt: new Date().toISOString() },
+        ...prev,
+      ]);
+    }
+  }, []);
+
+  // Admin approves / rejects a pending employee account
+  const reviewAccount: AppState['reviewAccount'] = useCallback((userId, decision) => {
+    if (currentUser?.role !== 'admin') return;
+    setUsers((prev) => prev.map((u) =>
+      u.id === userId ? { ...u, accountStatus: decision === 'approved' ? 'active' : ('rejected' as const) } : u
+    ));
+    setNotifications((prev) => [
+      { id: `n-${Date.now()}`, userId, type: decision === 'approved' ? 'account_validated' : 'account_rejected', title: decision === 'approved' ? 'Compte activé' : 'Compte refusé', message: decision === 'approved' ? 'Votre compte a été validé par un administrateur. Vous pouvez maintenant vous connecter.' : 'Votre demande de compte a été refusée par un administrateur.', read: false, createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
+  }, [currentUser]);
+
+  const resetPassword: AppState['resetPassword'] = useCallback((email, newPassword) => {
+    const target = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (!target) return false;
+    setUsers((prev) => prev.map((u) => u.id === target.id ? { ...u, password: newPassword } : u));
+    return true;
+  }, [users]);
+
   const addSpecialty = useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -1002,7 +1078,7 @@ suggestModification, reviewModification,
     addProjectAttachment,
     updateSubtaskProgress,
     scheduleClientMeeting,
-    addEmployee, updateUser, updateProfile,
+    addEmployee, register, reviewAccount, resetPassword, updateUser, updateProfile,
     markNotificationRead, markAllNotificationsRead,
     activeUserIds, setUserActive,
   }), [currentUser, sessionInitialized, login, logout, users, projects, notifications, specialties,
@@ -1018,7 +1094,7 @@ suggestModification, reviewModification,
        addProjectAttachment,
        updateSubtaskProgress,
        scheduleClientMeeting,
-       addEmployee, updateUser, updateProfile,
+       addEmployee, register, reviewAccount, resetPassword, updateUser, updateProfile,
        markNotificationRead, markAllNotificationsRead,
        activeUserIds, setUserActive]);
 

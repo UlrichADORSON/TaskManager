@@ -31,6 +31,9 @@ const notificationIcon: Record<AppNotification['type'], string> = {
   task_requested: '📥',
   task_request_approved: '✅',
   task_request_rejected: '❌',
+  account_created: '🆕',
+  account_validated: '✅',
+  account_rejected: '⛔',
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
