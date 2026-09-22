@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 d5823a74ac0bda9ac3e5bde967724d49073d3256 annickah <mjannickah@gmail.com> 1789578501 +0300	commit (initial): first commit
+d5823a74ac0bda9ac3e5bde967724d49073d3256 0000000000000000000000000000000000000000 annickah <mjannickah@gmail.com> 1789578501 +0300	Branch: renamed refs/heads/master to refs/heads/main
+0000000000000000000000000000000000000000 d5823a74ac0bda9ac3e5bde967724d49073d3256 annickah <mjannickah@gmail.com> 1789578501 +0300	Branch: renamed refs/heads/master to refs/heads/main
+d5823a74ac0bda9ac3e5bde967724d49073d3256 8ceea1c84ea05a39936322ce4b81113fc51a1370 annickah <mjannickah@gmail.com> 1789651072 +0300	commit: auth
+8ceea1c84ea05a39936322ce4b81113fc51a1370 021aed267572e12c70da3c5999482e4c6f4243c7 UlrichADORSON <mjannickah@gmail.com> 1789703347 +0300	commit: feat: auth with backend
+021aed267572e12c70da3c5999482e4c6f4243c7 13d622f085e168a301207c2c322c7f61f59ba45c UlrichADORSON <mjannickah@gmail.com> 1789703783 +0300	commit: feat: authentification
