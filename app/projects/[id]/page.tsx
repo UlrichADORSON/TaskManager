@@ -672,18 +672,6 @@ toast({ title: 'Demande envoyée', description: `Votre demande de modification (
                 </Button>
               ) : null}
             </Card>
-
-            <Card className="p-5">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-primary" /> Progression du projet
-                </h3>
-                <Button variant="ghost" size="sm" onClick={() => setActiveTab('progress')}>Voir le détail</Button>
-              </div>
-              <Suspense fallback={<div className="h-44 flex items-center justify-center text-muted-foreground text-sm">Chargement du graphique...</div>}>
-                <ProgressChart data={project.progressTimeline} />
-              </Suspense>
-            </Card>
           </div>
         </TabsContent>
 

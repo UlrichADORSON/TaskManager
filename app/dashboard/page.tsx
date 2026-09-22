@@ -574,14 +574,14 @@ export default function DashboardPage() {
           className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6"
         >
           {/* Progression globale — courbe prévu vs réel */}
-          <Card className="p-5 lg:col-span-2">
+          <Card className="p-5 lg:col-span-2 flex flex-col">
             <div className="flex items-baseline justify-between gap-4 mb-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" /> Progression globale de mes projets
               </h3>
               <span className="text-xs text-muted-foreground">Moyenne prévu vs réel</span>
             </div>
-            <div className="h-64 sm:h-72">
+            <div className="flex-1 min-h-64 sm:min-h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={clientProgressData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
