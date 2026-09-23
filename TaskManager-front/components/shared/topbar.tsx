@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from '@/lib/theme-provider';
 import { Bell, Search, Menu, CheckCheck, User as UserIcon, Settings, LogOut, Sun, Moon, ChevronDown, Phone, Building2 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
+import { useConfirm } from '@/lib/use-confirm';
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { RoleBadge } from '@/components/shared/badges';
 import { timeAgo } from '@/lib/status';
@@ -31,9 +32,10 @@ const notificationIcon: Record<AppNotification['type'], string> = {
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
-  const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, projects, logout } = useApp();
-  const router = useRouter();
-  const { theme, setTheme } = useTheme();
+   const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, projects, logout } = useApp();
+   const [confirm, ConfirmDialog] = useConfirm();
+   const router = useRouter();
+   const { theme, setTheme } = useTheme();
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -76,12 +78,13 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       ).slice(0, 6)
     : [];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    if (await confirm('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?')) logout()
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center gap-4 px-4 lg:px-6">
+    <>
+      <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center gap-4 px-4 lg:px-6">
       <button onClick={onMenuClick} className="lg:hidden h-10 w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors">
         <Menu className="h-5 w-5" />
       </button>
@@ -291,5 +294,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
       </div>
     </header>
+    <ConfirmDialog />
+    </>
   );
 }

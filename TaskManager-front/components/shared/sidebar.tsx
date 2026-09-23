@@ -8,6 +8,7 @@ import {
   FileText, Settings, LogOut, ChevronLeft, Layers, Bell, UserCog, History,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
+import { useConfirm } from '@/lib/use-confirm';
 import { cn } from '@/lib/utils';
 import type { Role } from '@/types';
 
@@ -35,6 +36,7 @@ const adminNavItems: NavItem[] = [
 export function Sidebar({ collapsed, onToggle, mobileOpen }: { collapsed: boolean; onToggle: () => void; mobileOpen?: boolean }) {
   const pathname = usePathname();
   const { currentUser, logout, notifications } = useApp();
+  const [confirm, ConfirmDialog] = useConfirm();
 
   if (!currentUser) return null;
 
@@ -112,12 +114,15 @@ export function Sidebar({ collapsed, onToggle, mobileOpen }: { collapsed: boolea
           {!isCollapsed && <span>Réduire</span>}
         </button>
         <button
-          onClick={() => logout()}
+          onClick={async () => {
+            if (await confirm('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?')) logout()
+          }}
           className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
         >
           <LogOut className="h-[18px] w-[18px] text-sidebar-foreground/50" />
           {!isCollapsed && <span>Déconnexion</span>}
         </button>
+        <ConfirmDialog />
       </div>
     </motion.aside>
   );

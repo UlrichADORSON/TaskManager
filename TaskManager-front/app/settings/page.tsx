@@ -8,6 +8,7 @@ import {
   Building2, MapPin, Upload, X, Check, Pencil,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
+import { useConfirm } from '@/lib/use-confirm';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import { toast } from '@/hooks/use-toast';
 export default function SettingsPage() {
   const user = useAuthGuard();
   const { logout, users, updateProfile, specialties } = useApp();
+  const [confirm, ConfirmDialog] = useConfirm();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -250,14 +252,17 @@ export default function SettingsPage() {
       {/* Session */}
       <Card className="p-6 mt-4 max-w-4xl">
         <h3 className="font-semibold mb-4">Session</h3>
-        <Button
-          variant="outline"
-          className="text-destructive hover:bg-destructive/5"
-          onClick={() => logout()}
-        >
-          <LogOut className="h-4 w-4 mr-2" /> Se déconnecter
-        </Button>
-      </Card>
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/5"
+            onClick={async () => {
+              if (await confirm('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?')) logout()
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" /> Se déconnecter
+          </Button>
+        </Card>
+      <ConfirmDialog />
     </AppShell>
   );
 }
