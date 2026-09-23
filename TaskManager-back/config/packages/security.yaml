@@ -42,6 +42,7 @@ security:
             jwt: ~
 
     access_control:
+        - { path: ^/api/health$, roles: PUBLIC_ACCESS }
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Project;
+use App\Entity\ProjectStatusLog;
 use App\Entity\User;
 use App\Repository\ProjectRepository;
 use App\Repository\UserRepository;
@@ -11,10 +12,22 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\SerializerInterface;
 
 class ProjectController extends AbstractController
 {
+    private function parseOptionalDate(mixed $value, ?\DateTimeImmutable $default = null): ?\DateTimeImmutable
+    {
+        if ($value === null || $value === '') {
+            return $default;
+        }
+
+        try {
+            return new \DateTimeImmutable((string) $value);
+        } catch (\Exception) {
+            throw new \InvalidArgumentException('Date de projet invalide.');
+        }
+    }
+
     #[Route('/api/projects', name: 'api_projects_list', methods: ['GET'])]
     public function list(ProjectRepository $projectRepository): JsonResponse
     {
@@ -28,6 +41,8 @@ class ProjectController extends AbstractController
                 'priority' => $p->getPriority(),
                 'budget' => $p->getBudget(),
                 'progress' => $p->getProgress(),
+                'startDate' => $p->getStartDate()?->format(\DateTimeInterface::ATOM),
+                'endDate' => $p->getEndDate()?->format(\DateTimeInterface::ATOM),
                 'category' => $p->getCategory(),
                 'createdAt' => $p->getCreatedAt()?->format(\DateTimeInterface::ATOM),
                 'client' => $p->getClient() ? [
@@ -62,6 +77,8 @@ class ProjectController extends AbstractController
         $project->setPriority($data['priority'] ?? 'medium');
         $project->setBudget((int) ($data['budget'] ?? 0));
         $project->setProgress(0);
+        $project->setStartDate($this->parseOptionalDate($data['startDate'] ?? null, new \DateTimeImmutable()));
+        $project->setEndDate($this->parseOptionalDate($data['endDate'] ?? null, (new \DateTimeImmutable())->modify('+30 days')));
         $project->setCategory($data['category'] ?? '');
         $project->setClient($client);
 
@@ -75,7 +92,22 @@ class ProjectController extends AbstractController
         ];
         $project->setMembers($members);
 
+        // Keep the relational ProjectMember table synchronized with the JSON
+        // members field used by the existing frontend.
+        $projectMember = new \App\Entity\ProjectMember();
+        $projectMember->setProject($project);
+        $projectMember->setUser($client);
+        $projectMember->setRole('client');
+        $em->persist($projectMember);
+
+        $statusLog = new ProjectStatusLog();
+        $statusLog->setProject($project);
+        $statusLog->setFromStatus(null);
+        $statusLog->setToStatus('pending');
+        $statusLog->setActor($client);
+
         $em->persist($project);
+        $em->persist($statusLog);
         $em->flush();
 
         return $this->json([
@@ -86,15 +118,50 @@ class ProjectController extends AbstractController
             'priority' => $project->getPriority(),
             'budget' => $project->getBudget(),
             'progress' => $project->getProgress(),
+            'startDate' => $project->getStartDate()?->format(\DateTimeInterface::ATOM),
+            'endDate' => $project->getEndDate()?->format(\DateTimeInterface::ATOM),
             'category' => $project->getCategory(),
             'createdAt' => $project->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'members' => $project->getMembers(),
         ], 201);
     }
 
+    #[Route('/api/projects/{id}/status', name: 'api_projects_status', methods: ['PATCH'])]
+    public function updateStatus(
+        int $id,
+        Request $request,
+        ProjectRepository $projectRepository,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $project = $projectRepository->find($id);
+        if (!$project) return $this->json(['message' => 'Projet introuvable.'], 404);
+
+        $isAdmin = in_array('ROLE_ADMIN', $currentUser->getRoles(), true);
+        $isManager = $project->getManager()?->getId() === $currentUser->getId();
+        if (!$isAdmin && !$isManager) return $this->json(['message' => 'Non autorisé.'], 403);
+
+        $data = json_decode($request->getContent(), true);
+        $status = (string) ($data['status'] ?? '');
+        $allowed = ['pending', 'validated', 'assigned', 'in_progress', 'completed', 'rejected'];
+        if (!in_array($status, $allowed, true)) return $this->json(['message' => 'Statut invalide.'], 400);
+
+        $log = new ProjectStatusLog();
+        $log->setProject($project);
+        $log->setFromStatus($project->getStatus());
+        $log->setToStatus($status);
+        $log->setActor($currentUser);
+        $project->setStatus($status);
+        $em->persist($log);
+        $em->flush();
+
+        return $this->json(['id' => $project->getId(), 'status' => $project->getStatus()]);
+    }
+
     #[Route('/api/projects/{id}/members', name: 'api_projects_add_member', methods: ['POST'])]
     public function addMember(
-        mixed $id,
+        int $id,
         Request $request,
         ProjectRepository $projectRepository,
         UserRepository $userRepository,
@@ -138,7 +205,7 @@ class ProjectController extends AbstractController
             return $this->json(['message' => 'L\'utilisateur est obligatoire.'], 400);
         }
 
-        $member = $userRepository->find((int) $userId);
+        $member = ctype_digit($userId) ? $userRepository->find((int) $userId) : $userRepository->findOneBy(['email' => $userId]);
         if (!$member) {
             return $this->json(['message' => 'Utilisateur introuvable.'], 404);
         }
@@ -172,8 +239,8 @@ class ProjectController extends AbstractController
 
     #[Route('/api/projects/{projectId}/members/{userId}', name: 'api_projects_remove_member', methods: ['DELETE'])]
     public function removeMember(
-        mixed $projectId,
-        mixed $userId,
+        int $projectId,
+        int $userId,
         ProjectRepository $projectRepository,
         EntityManagerInterface $em
     ): JsonResponse {
