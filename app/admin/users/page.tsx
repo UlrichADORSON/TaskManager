@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Search, Users as UsersIcon, Building2, UserCog, ShieldHalf } from 'lucide-react';
+import { Search, Users as UsersIcon, Building2, UserCog, ShieldHalf, Inbox, Check, X } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { AppShell } from '@/components/shared/app-shell';
@@ -11,6 +11,10 @@ import { ViewToggle, type ViewMode } from '@/components/shared/view-toggle';
 import { UserListView, StatusLegend } from '@/components/shared/user-list-view';
 import { UserKanbanBoard } from '@/components/shared/user-kanban-board';
 import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
+import { UserAvatar } from '@/components/shared/user-avatar';
+import { RoleBadge } from '@/components/shared/badges';
+import { Card } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
 
@@ -25,7 +29,7 @@ const GROUPS: { id: GroupFilter; label: string; icon: any }[] = [
 export default function AdminUsersPage() {
   const user = useAuthGuard();
   const router = useRouter();
-  const { users, projects, activeUserIds } = useApp();
+  const { users, projects, activeUserIds, reviewAccount } = useApp();
   const [group, setGroup] = useState<GroupFilter>('all');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('list');
@@ -69,6 +73,8 @@ export default function AdminUsersPage() {
     team: users.filter((u) => u.role === 'membre' || u.role === 'chef_de_projet').length,
   };
 
+  const pendingUsers = users.filter((u) => u.accountStatus === 'pending');
+
   return (
     <AppShell>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
@@ -85,6 +91,49 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </motion.div>
+
+      {pendingUsers.length > 0 && (
+        <Card className="mb-6 border-warning/30 bg-warning/[0.04] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Inbox className="h-4 w-4 text-warning" />
+            <h3 className="font-semibold text-sm">Comptes employés à valider</h3>
+            <span className="ml-auto rounded-full bg-warning/15 text-warning text-[11px] font-bold px-2 py-0.5">
+              {pendingUsers.length}
+            </span>
+          </div>
+          <div className="grid gap-3">
+            {pendingUsers.map((u) => (
+              <div key={u.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <UserAvatar user={u} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate">{u.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+                <div className="hidden sm:flex flex-col items-end gap-0.5">
+                  <RoleBadge role={u.role} />
+                  {u.memberSpecialty && <span className="text-[10px] text-muted-foreground">{u.memberSpecialty}</span>}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => { reviewAccount(u.id, 'approved'); toast({ title: 'Compte validé', description: `${u.name} peut maintenant se connecter.` }); }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-success/15 text-success px-3 py-1.5 text-xs font-semibold hover:bg-success/25 transition-all active:scale-[0.98]"
+                  >
+                    <Check className="h-3.5 w-3.5" /> Valider
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { reviewAccount(u.id, 'rejected'); toast({ title: 'Compte refusé', description: `${u.name} a été notifié du refus.` }); }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-destructive/10 text-destructive px-3 py-1.5 text-xs font-semibold hover:bg-destructive/20 transition-all active:scale-[0.98]"
+                  >
+                    <X className="h-3.5 w-3.5" /> Refuser
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {GROUPS.map((g) => {

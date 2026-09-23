@@ -46,6 +46,7 @@ export const subtaskStatusMeta: Record<SubtaskStatus, { label: string; color: st
   in_progress: { label: 'En cours',   color: 'text-primary',               bg: 'bg-primary/10 dark:bg-primary/15',    dot: 'bg-primary' },
   review:      { label: 'En révision',color: 'text-chart-5',               bg: 'bg-chart-5/10 dark:bg-chart-5/15',    dot: 'bg-chart-5' },
   done:        { label: 'Terminé',    color: 'text-success',               bg: 'bg-success/10 dark:bg-success/15',    dot: 'bg-success' },
+  cancelled:   { label: 'Annulé',     color: 'text-destructive',           bg: 'bg-destructive/10 dark:bg-destructive/15', dot: 'bg-destructive' },
 };
 
 export const priorityMeta: Record<Priority, { label: string; color: string; bg: string; dot: string; ring: string }> = {

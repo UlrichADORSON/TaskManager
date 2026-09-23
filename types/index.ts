@@ -14,7 +14,7 @@ export type ProjectStatus =
   | 'in_progress'  // En cours
   | 'completed';   // Terminé
 
-export type SubtaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+export type SubtaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled';
 
 export type ModificationStatus = 'pending' | 'pending_client' | 'approved' | 'rejected';
 
@@ -41,6 +41,7 @@ export interface User {
   createdAt: string;        // ISO
   active?: boolean;         // true when the user is currently connected
   lastActive?: string;      // ISO — last login timestamp
+  accountStatus?: 'pending' | 'active' | 'rejected';  // accounts created by employees/clients wait for admin approval (admin-created accounts are 'active')
 }
 
 // ------------------------------------ Attachment
@@ -122,11 +123,38 @@ export interface TaskRequest {
   title: string;
   description: string;
   priority: Priority;
+  besoinDate: string | null;     // date pour sa nécessité (deadline souhaitée)
+  photoUrl: string | null;       // photo/pièce jointe jointe à la demande
+  photoName: string | null;
   status: TaskRequestStatus;
   reviewedById: string | null;
   reviewedAt: string | null;
   reviewNote: string;
   createdAt: string;
+}
+
+// ------------------------------------ Requête (the team asks the client for a photo / file / info)
+export type RequeteStatus = 'pending' | 'answered';
+
+export interface RequeteResponse {
+  text: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  at: string;
+}
+
+export interface Requete {
+  id: string;
+  projectId: string;
+  subtaskId: string | null;       // optional — requête linked to a specific subtask
+  createdById: string;
+  createdByName: string;
+  content: string;                // what is asked from the client
+  status: RequeteStatus;
+  createdAt: string;
+  respondedAt: string | null;
+  response: RequeteResponse | null;
 }
 
 // ------------------------------------ Progress timeline point (for the curve chart)
@@ -191,6 +219,7 @@ export interface Project {
   calendarEvents: CalendarEvent[];
   modifications: ModificationRequest[];
   taskRequests: TaskRequest[];
+  requetes: Requete[];
   // Submission detail fields
   platformUsers?: string;      // utilisateurs de la plateforme
   desiredFeatures?: string;    // fonctionnalités souhaitées
@@ -213,7 +242,9 @@ export interface AppNotification {
       | 'project_completed' | 'modification_requested' | 'modification_reviewed'
       | 'member_added' | 'subtask_reviewed' | 'member_created' | 'calendar_event'
       | 'task_comment' | 'project_attachment'
-      | 'task_requested' | 'task_request_approved' | 'task_request_rejected';
+      | 'task_requested' | 'task_request_approved' | 'task_request_rejected'
+      | 'requete_created' | 'requete_answered'
+      | 'account_created' | 'account_validated' | 'account_rejected';
   title: string;
   message: string;
   projectId?: string;

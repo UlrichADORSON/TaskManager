@@ -38,6 +38,7 @@ import {
   StatusBadge, PriorityBadge, SubtaskStatusBadge, RoleBadge,
 } from '@/components/shared/badges';
 import { UserAvatar } from '@/components/shared/user-avatar';
+import { ModRequestCard } from '@/components/shared/mod-request-card';
 import { MemberProfileDialog } from '@/components/shared/member-profile-dialog';
 import { ProjectCalendar } from '@/components/shared/project-calendar';
 import { ProgressBar, ProgressRing } from '@/components/shared/progress';
@@ -89,7 +90,9 @@ export default function ProjectDetailPage() {
   const [reviewDialog, setReviewDialog] = useState<{ mod: ModificationRequest; decision: 'approved' | 'rejected' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [taskReqOpen, setTaskReqOpen] = useState(false);
-  const [taskReqForm, setTaskReqForm] = useState({ title: '', description: '', priority: 'medium' as Priority });
+  const [taskReqForm, setTaskReqForm] = useState({ title: '', description: '', priority: 'medium' as Priority, besoinDate: '' });
+  const [taskReqPhoto, setTaskReqPhoto] = useState<{ url: string; name: string } | null>(null);
+  const taskReqPhotoRef = useRef<HTMLInputElement>(null);
   const [taskReviewDialog, setTaskReviewDialog] = useState<{ req: TaskRequest; decision: 'approved' | 'rejected' } | null>(null);
   const [taskReviewNote, setTaskReviewNote] = useState('');
   const [fileViewer, setFileViewer] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
@@ -106,6 +109,7 @@ export default function ProjectDetailPage() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [taskViewMode, setTaskViewMode] = useState<'kanban' | 'list'>('kanban');
   const [detailSubtask, setDetailSubtask] = useState<Subtask | null>(null);
+  const [calendarFocus, setCalendarFocus] = useState<{ id: string; date: string } | null>(null);
   const projectAttachmentRef = useRef<HTMLInputElement>(null);
 
   const currentModValue = useMemo(() => {
@@ -153,6 +157,8 @@ export default function ProjectDetailPage() {
   const isProjectMember = project.members.some((m) => m.userId === user.id);
   const isProjectOwner = user.role === 'client' && project.clientId === user.id;
   const canViewAttachments = user.role === 'admin' || user.role === 'chef_de_projet' || isProjectMember;
+  const clientMods = project.modifications.filter((m) => getUser(users, m.requestedById)?.role === 'client');
+  const teamMods = project.modifications.filter((m) => getUser(users, m.requestedById)?.role !== 'client');
   const pendingMods = project.modifications.filter((m) => m.status === 'pending' || m.status === 'pending_client');
   const reviewCount = project.subtasks.filter((st) => st.status === 'review').length;
   const availableEmployees = members.filter((e) => !project.members.some((m) => m.userId === e.id));
@@ -176,10 +182,27 @@ export default function ProjectDetailPage() {
 
   const handleRequestTask = () => {
     if (!taskReqForm.title.trim()) return;
-    requestTask(project.id, { title: taskReqForm.title, description: taskReqForm.description, priority: taskReqForm.priority });
+    requestTask(project.id, {
+      title: taskReqForm.title,
+      description: taskReqForm.description,
+      priority: taskReqForm.priority,
+      besoinDate: taskReqForm.besoinDate || null,
+      photoUrl: taskReqPhoto?.url ?? null,
+      photoName: taskReqPhoto?.name ?? null,
+    });
     setTaskReqOpen(false);
-    setTaskReqForm({ title: '', description: '', priority: 'medium' });
+    setTaskReqForm({ title: '', description: '', priority: 'medium', besoinDate: '' });
+    setTaskReqPhoto(null);
+    if (taskReqPhotoRef.current) taskReqPhotoRef.current.value = '';
     toast({ title: 'Demande envoyée', description: 'Votre demande de tâche sera examinée par l\'administrateur.' });
+  };
+
+  const handleTaskReqPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setTaskReqPhoto({ url: String(reader.result), name: file.name });
+    reader.readAsDataURL(file);
   };
 
   const handleReviewTaskRequest = () => {
@@ -219,8 +242,8 @@ export default function ProjectDetailPage() {
       addEmployeeFromContext({
         name: memberForm.name, email: memberForm.email, password: memberForm.password,
         phone: '',
-        role: memberForm.role === 'chef_de_projet' ? 'chef_de_projet' : 'membre',
-        memberSpecialty: memberForm.role === 'chef_de_projet' ? undefined : memberForm.specialty as MemberSpecialty,
+        role: memberForm.role as 'admin' | 'chef_de_projet' | 'membre',
+        memberSpecialty: memberForm.role === 'membre' ? memberForm.specialty as MemberSpecialty : undefined,
       });
       setAddMemberOpen(false);
       setMemberForm({ existingUserId: '', role: 'membre', createNew: false, name: '', email: '', password: '', specialty: 'Designer' });
@@ -327,9 +350,9 @@ export default function ProjectDetailPage() {
       projectId: project.id, subtaskId, target, field: modReq.field,
       oldValue, newValue: modReq.newValue, reason: modReq.reason,
     });
-    setModReqOpen(false);
+setModReqOpen(false);
     setModReq({ target: 'project', subtaskId: '', field: 'description', newValue: '', reason: '' });
-    toast({ title: 'Demande envoyée', description: `Votre demande de modification (${modReq.field}) attend la validation.` });
+toast({ title: 'Demande envoyée', description: `Votre demande de modification (${modReq.field}) attend la validation.` });
   };
 
   const handleModificationRequestFromDetail = (subtaskId: string) => {
@@ -477,6 +500,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="progress" className="gap-1.5"><BarChart3 className="h-4 w-4" /> Avancement</TabsTrigger>
           <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="h-4 w-4" /> Tâches</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5"><UserCircle className="h-4 w-4" /> Équipe</TabsTrigger>
+          {/* Modifications du client (validées par l'admin / chef de projet) */}
           <TabsTrigger value="modifications" className="gap-1.5">
             <Edit3 className="h-4 w-4" /> Modifications
             {pendingMods.length > 0 && (
@@ -673,7 +697,7 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
                 {/* Calendrier mensuel */}
-                <ProjectCalendar events={project.calendarEvents} subtasks={project.subtasks} className="w-full xl:sticky xl:top-24" />
+                <ProjectCalendar events={project.calendarEvents} subtasks={project.subtasks} className="w-full xl:sticky xl:top-24" focus={calendarFocus} />
 
                 {/* Événements du projet + sous-tâches (cadrage) — colonne de droite sur écran large */}
                 <div className="space-y-5">
@@ -681,7 +705,12 @@ export default function ProjectDetailPage() {
                     <h4 className="text-sm font-medium text-muted-foreground mb-3">Événements du projet</h4>
                     <div className="space-y-2">
                       {project.calendarEvents.map((ev) => (
-                        <div key={ev.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
+                        <button
+                          key={ev.id}
+                          type="button"
+                          onClick={() => setCalendarFocus({ id: ev.id, date: ev.date })}
+                          className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30 hover:border-primary/40 hover:bg-muted/50 transition-all text-left group"
+                        >
                           <div className={cn('h-9 w-9 rounded-[12px] flex items-center justify-center flex-shrink-0',
                             ev.type === 'rendez_vous' ? 'bg-primary text-primary-foreground' : ev.type === 'cadrage' ? 'bg-info text-info-foreground' : ev.type === 'livraison' ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground')}>
                             <CalendarDays className="h-4 w-4" />
@@ -691,7 +720,8 @@ export default function ProjectDetailPage() {
                             <p className="text-xs text-muted-foreground">{formatDateTime(ev.date)}</p>
                             {ev.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ev.description}</p>}
                           </div>
-                        </div>
+                          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary flex-shrink-0" />
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -701,7 +731,12 @@ export default function ProjectDetailPage() {
                       {project.subtasks.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucune sous-tâche définie.</p>
                       ) : project.subtasks.map((st) => (
-                        <div key={st.id} className="flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30">
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setCalendarFocus({ id: st.id, date: st.startDate })}
+                          className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-border/40 bg-muted/30 hover:border-primary/40 hover:bg-muted/50 transition-all text-left group"
+                        >
                           <div className="h-9 w-9 rounded-[12px] bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
                             <ListTodo className="h-4 w-4" />
                           </div>
@@ -710,7 +745,7 @@ export default function ProjectDetailPage() {
                             <p className="text-xs text-muted-foreground">{formatDate(st.startDate)} → {formatDate(st.dueDate)}</p>
                           </div>
                           <SubtaskStatusBadge status={st.status} />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -754,8 +789,8 @@ export default function ProjectDetailPage() {
         {/* ---- Tasks tab (with comments) ---- */}
         <TabsContent value="tasks">
           <div>
-            {/* Client task requests (validated by the admin) */}
-            {(isProjectOwner || user.role === 'admin') && (
+            {/* Client task requests (validated by admin / chef de projet) */}
+            {(isProjectOwner || canManage || isProjectMember) && (
               <div className="mb-5 rounded-xl border border-border bg-card">
                 <div className="p-4 border-b border-border flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -763,11 +798,12 @@ export default function ProjectDetailPage() {
                     <h3 className="text-sm font-semibold">Demandes de tâche</h3>
                     <span className="text-xs text-muted-foreground">({project.taskRequests.length})</span>
                   </div>
-                  {isProjectOwner && (
-                    <Button size="sm" onClick={() => setTaskReqOpen(true)}>
-                      <Plus className="h-4 w-4 mr-1.5" /> Demander une tâche
-                    </Button>
-                  )}
+                  {isProjectOwner ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>Une nouvelle tâche se demande depuis le <button type="button" onClick={() => router.push('/dashboard')} className="text-primary font-medium hover:underline">tableau de bord</button>.</span>
+                    </div>
+                  ) : null}
                 </div>
                 {project.taskRequests.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground">
@@ -787,14 +823,32 @@ export default function ProjectDetailPage() {
                           {req.description && (
                             <p className="text-xs text-muted-foreground mt-1">{req.description}</p>
                           )}
-                          <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" /> {formatDate(req.createdAt)}
+                          <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-2 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3" /> Demande : {formatDate(req.createdAt)}
+                            </span>
+                            {req.besoinDate && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> Nécessité : {formatDate(req.besoinDate)}
+                              </span>
+                            )}
                             {(req.status === 'approved' || req.status === 'rejected') && req.reviewNote && (
-                              <span> · Note admin : « {req.reviewNote} »</span>
+                              <span> · Note : « {req.reviewNote} »</span>
                             )}
                           </p>
                         </div>
-                        {user.role === 'admin' && req.status === 'pending' && (
+                        {req.photoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setFileViewer({ url: req.photoUrl!, fileName: req.photoName ?? 'photo_demande', fileType: 'image/*' })}
+                            className="flex-shrink-0 group flex items-center gap-2 p-1.5 rounded-lg bg-muted/40 hover:bg-muted transition-colors"
+                            title={req.photoName ?? 'Voir la photo'}
+                          >
+                            <img src={req.photoUrl} alt="" className="h-9 w-9 rounded-md object-cover" />
+                            <Eye className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+                          </button>
+                        )}
+                        {canManage && req.status === 'pending' && (
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Button size="sm" variant="outline" onClick={() => { setTaskReviewDialog({ req, decision: 'rejected' }); setTaskReviewNote(''); }}>
                               <XCircle className="h-3.5 w-3.5 mr-1.5" /> Refuser
@@ -1145,7 +1199,7 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ---- Modifications tab ---- */}
+        {/* ---- Modifications tab (demandes de changement, validées par l'admin / chef de projet) ---- */}
         <TabsContent value="modifications">
           <div>
             <div className="mb-5 rounded-xl border border-border bg-muted/20 overflow-hidden">
@@ -1157,9 +1211,9 @@ export default function ProjectDetailPage() {
                   <div>
                     <h3 className="text-sm font-semibold">Demandes de modification</h3>
                     <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-                      Besoin d’un ajustement sur le projet (titre, description, délai, priorité, budget…) ou sur une sous-tâche ?
-                      Faites une demande : selon l’émetteur, elle est validée par l’admin puis par le client, ou directement par le client.
-                      Vous serez notifié(e) à chaque étape.
+                      Les changements proposés sur le projet (titre, description, délai, priorité, budget) ou sur une sous-tâche,
+                      soit par le client, soit par l&apos;équipe. Chaque demande est examinée puis validée ou rejetée
+                      par l&apos;admin / le chef de projet.
                     </p>
                   </div>
                 </div>
@@ -1172,7 +1226,7 @@ export default function ProjectDetailPage() {
               <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground bg-background/50">
                 <span className="font-medium text-foreground">Comprendre les statuts :</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> En attente — pas encore examinée</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-info" /> Validation client — approuvée par l’équipe, reste la validation du client</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-info" /> Validation client — en attente de la validation du client</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Approuvée — le changement est appliqué</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Rejetée — un motif est indiqué</span>
               </div>
@@ -1184,71 +1238,58 @@ export default function ProjectDetailPage() {
                 <p>Aucune demande de modification pour ce projet.</p>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {project.modifications.map((mod) => {
-                  const requester = getUser(users, mod.requestedById);
-                  const reviewer = mod.reviewedById ? getUser(users, mod.reviewedById) : null;
-                  const subtask = mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId) : null;
-                  return (
-                    <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                      <Card className={`p-5 ${mod.status === 'pending' ? 'border-warning/30' : mod.status === 'pending_client' ? 'border-info/30' : mod.status === 'approved' ? 'border-success/30' : 'border-destructive/30'}`}>
-                        <div className="flex items-start gap-4">
-                          {requester && <UserAvatar user={requester} size="md" />}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-2">
-                              <span className="font-medium text-sm">{mod.requestedByName}</span>
-                              <span className="text-xs text-muted-foreground">demande une modification sur</span>
-                              {subtask ? (
-                                <Badge variant="outline" className="text-xs">{subtask.title}</Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs">le projet</Badge>
-                              )}
-                              <ModificationStatusBadge status={mod.status} />
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                              <div className="p-3 rounded-lg bg-muted/30">
-                                <p className="text-xs text-muted-foreground mb-1">Valeur actuelle — {fieldLabels[mod.field] ?? mod.field}</p>
-                                <p className="text-sm line-clamp-2">{mod.oldValue || '(vide)'}</p>
-                              </div>
-                              <div className="p-3 rounded-lg bg-primary/5 border border-primary/15">
-                                <p className="text-xs text-muted-foreground mb-1">Nouvelle valeur proposée</p>
-                                <p className="text-sm line-clamp-2 font-medium">{mod.newValue}</p>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex items-start gap-2">
-                              <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <p className="text-sm text-muted-foreground">{mod.reason}</p>
-                            </div>
-                            {mod.status === 'pending_client' && mod.teamReview && (
-                              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
-                                <Check className="h-3.5 w-3.5 text-success flex-shrink-0" />
-                                Approuvée par {getUser(users, mod.teamReview.userId)?.name ?? 'l\'équipe'}
-                                <span className="text-muted-foreground/70">— en attente de votre validation</span>
-                              </div>
-                            )}
-                            {mod.status !== 'pending' && mod.status !== 'pending_client' && reviewer && (
-                              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
-                                <Clock className="h-3.5 w-3.5" />
-                                {mod.status === 'approved' ? 'Approuvée' : 'Rejetée'} par {reviewer.name}
-                                {mod.reviewNote && <span className="italic">— « {mod.reviewNote} »</span>}
-                              </div>
-                            )}
-                            {canApproveMod(mod) && (
-                              <div className="mt-4 flex gap-2 pt-3 border-t border-border/50">
-                                <Button size="sm" className="bg-success hover:bg-success/90 h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}>
-                                  <Check className="h-3.5 w-3.5" /> {mod.status === 'pending_client' ? 'Valider' : 'Approuver'}
-                                </Button>
-                                <Button size="sm" variant="destructive" className="h-8 gap-1.5" onClick={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}>
-                                  <XCircle className="h-3.5 w-3.5" /> Rejeter
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
+              <div className="space-y-6">
+                {teamMods.length > 0 && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-info flex-shrink-0" />
+                      <h4 className="text-sm font-semibold">Demandes de l&apos;équipe</h4>
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">admin · chef de projet · employé</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">({teamMods.length})</span>
+                    </div>
+                    {teamMods.map((mod) => (
+                      <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                        <ModRequestCard
+                          mod={mod}
+                          project={{ id: project.id, title: project.title }}
+                          requester={getUser(users, mod.requestedById)}
+                          reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
+                          users={users}
+                          fieldLabel={(f) => fieldLabels[f] ?? f}
+                          subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
+                          canApprove={canApproveMod(mod)}
+                          onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
+                          onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
+                        />
+                      </motion.div>
+                    ))}
+                  </section>
+                )}
+                {clientMods.length > 0 && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 text-chart-5 flex-shrink-0" />
+                      <h4 className="text-sm font-semibold">Demandes du client</h4>
+                      <span className="text-xs text-muted-foreground tabular-nums">({clientMods.length})</span>
+                    </div>
+                    {clientMods.map((mod) => (
+                      <motion.div key={mod.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                        <ModRequestCard
+                          mod={mod}
+                          project={{ id: project.id, title: project.title }}
+                          requester={getUser(users, mod.requestedById)}
+                          reviewer={mod.reviewedById ? getUser(users, mod.reviewedById) : null}
+                          users={users}
+                          fieldLabel={(f) => fieldLabels[f] ?? f}
+                          subtaskTitle={mod.subtaskId ? project.subtasks.find((st) => st.id === mod.subtaskId)?.title : undefined}
+                          canApprove={canApproveMod(mod)}
+                          onApprove={() => { setReviewDialog({ mod, decision: 'approved' }); setReviewNote(''); }}
+                          onReject={() => { setReviewDialog({ mod, decision: 'rejected' }); setReviewNote(''); }}
+                        />
+                      </motion.div>
+                    ))}
+                  </section>
+                )}
               </div>
             )}
           </div>
@@ -1413,6 +1454,7 @@ export default function ProjectDetailPage() {
                     <SelectContent>
                       <SelectItem value="membre">Membre du projet</SelectItem>
                       <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1454,6 +1496,7 @@ export default function ProjectDetailPage() {
                         <SelectContent>
                           <SelectItem value="membre">Membre du projet</SelectItem>
                           <SelectItem value="chef_de_projet">Chef de projet</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1492,17 +1535,52 @@ export default function ProjectDetailPage() {
               <Label htmlFor="tr-desc">Description</Label>
               <Textarea id="tr-desc" value={taskReqForm.description} onChange={(e) => setTaskReqForm((f) => ({ ...f, description: e.target.value }))} placeholder="Décrivez le besoin..." rows={3} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="tr-need">Date de nécessité</Label>
+                <Input
+                  id="tr-need"
+                  type="date"
+                  className="mt-1"
+                  value={taskReqForm.besoinDate}
+                  onChange={(e) => setTaskReqForm((f) => ({ ...f, besoinDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Priorité</Label>
+                <Select value={taskReqForm.priority} onValueChange={(v) => setTaskReqForm((f) => ({ ...f, priority: v as Priority }))}>
+                  <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Basse</SelectItem>
+                    <SelectItem value="medium">Moyenne</SelectItem>
+                    <SelectItem value="high">Haute</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div>
-              <Label>Priorité</Label>
-              <Select value={taskReqForm.priority} onValueChange={(v) => setTaskReqForm((f) => ({ ...f, priority: v as Priority }))}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Basse</SelectItem>
-                  <SelectItem value="medium">Moyenne</SelectItem>
-                  <SelectItem value="high">Haute</SelectItem>
-                  <SelectItem value="urgent">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
+              <input ref={taskReqPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleTaskReqPhoto} />
+              {taskReqPhoto ? (
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+                  <img src={taskReqPhoto.url} alt="aperçu" className="h-10 w-10 rounded-lg object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{taskReqPhoto.name}</p>
+                    <button type="button" className="text-[11px] text-destructive hover:underline" onClick={() => { setTaskReqPhoto(null); if (taskReqPhotoRef.current) taskReqPhotoRef.current.value = ''; }}>
+                      Retirer la photo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => taskReqPhotoRef.current?.click()}
+                  className="w-full rounded-xl border-2 border-dashed border-border py-3 hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="text-xs font-medium">Ajouter une photo (optionnel)</span>
+                </button>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -1529,11 +1607,21 @@ export default function ProjectDetailPage() {
           <div className="space-y-3 py-4">
             {taskReviewDialog && (
               <div className="p-3 rounded-lg bg-muted/30 space-y-1">
-                <p className="text-sm font-medium">{taskReviewDialog.req.title}</p>
-                {taskReviewDialog.req.description && <p className="text-xs text-muted-foreground">{taskReviewDialog.req.description}</p>}
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <PriorityBadge priority={taskReviewDialog.req.priority} /> demandée par le client
-                </p>
+                <div className="flex items-start gap-3">
+                  {taskReviewDialog.req.photoUrl && (
+                    <img src={taskReviewDialog.req.photoUrl} alt="" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium">{taskReviewDialog.req.title}</p>
+                    {taskReviewDialog.req.description && <p className="text-xs text-muted-foreground">{taskReviewDialog.req.description}</p>}
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      <PriorityBadge priority={taskReviewDialog.req.priority} /> demandée par le client
+                      {taskReviewDialog.req.besoinDate && (
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> nécessaire le {formatDate(taskReviewDialog.req.besoinDate)}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
             {taskReviewDialog?.decision === 'approved' && (
@@ -1696,7 +1784,6 @@ export default function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Task discussion dialog */}
       {/* Client meeting dialog */}
       <Dialog open={meetingOpen} onOpenChange={setMeetingOpen}>
         <DialogContent className="max-w-md">
@@ -1786,6 +1873,7 @@ export default function ProjectDetailPage() {
           isProjectMember={isProjectMember}
           currentUserId={user.id}
           open={!!detailSubtask}
+          allSubtasks={project.subtasks}
           onClose={() => setDetailSubtask(null)}
           onStatusChange={(subtaskId, status) => { updateSubtaskStatus(project.id, subtaskId, status); setDetailSubtask(null); }}
           onProgressChange={(subtaskId, progress) => updateSubtaskProgress(project.id, subtaskId, progress)}
@@ -1811,17 +1899,6 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ cla
       </div>
     </div>
   );
-}
-
-function ModificationStatusBadge({ status }: { status: 'pending' | 'pending_client' | 'approved' | 'rejected' }) {
-  const config = {
-    pending: { label: 'En attente', className: 'bg-warning/15 text-warning border-warning/30' },
-    pending_client: { label: 'Validation client', className: 'bg-info/15 text-info border-info/30' },
-    approved: { label: 'Approuvée', className: 'bg-success/15 text-success border-success/30' },
-    rejected: { label: 'Rejetée', className: 'bg-destructive/15 text-destructive border-destructive/30' },
-  };
-  const c = config[status];
-  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
 function TaskRequestStatusBadge({ status }: { status: TaskRequest['status'] }) {

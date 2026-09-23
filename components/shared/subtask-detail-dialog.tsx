@@ -5,11 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, MessageSquare, Paperclip, Upload, Download, Eye,
   Image as ImageIcon, FileText, Send, Edit3, CheckCircle2,
-  ChevronDown, ChevronUp, History, Sliders, XCircle,
+  ChevronDown, ChevronUp, History, Sliders, XCircle, ArrowUpRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { SubtaskStatusBadge, PriorityBadge } from '@/components/shared/badges';
 import { UserAvatar } from '@/components/shared/user-avatar';
 import { ProgressBar } from '@/components/shared/progress';
@@ -24,6 +27,7 @@ interface SubtaskDetailDialogProps {
   isProjectMember: boolean;
   currentUserId: string;
   open: boolean;
+  allSubtasks?: Subtask[];
   onClose: () => void;
   onStatusChange: (subtaskId: string, status: SubtaskStatus) => void;
   onProgressChange: (subtaskId: string, progress: number) => void;
@@ -40,6 +44,7 @@ export function SubtaskDetailDialog({
   isProjectMember,
   currentUserId,
   open,
+  allSubtasks = [],
   onClose,
   onStatusChange,
   onProgressChange,
@@ -53,6 +58,7 @@ export function SubtaskDetailDialog({
   const [tempProgress, setTempProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [attachToId, setAttachToId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!subtask || !open) return null;
@@ -64,6 +70,10 @@ export function SubtaskDetailDialog({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
+    const targetId = attachToId || subtask.id;
+    const destTitle = targetId === subtask.id
+      ? subtask.title
+      : (allSubtasks.find((s) => s.id === targetId)?.title ?? 'la tâche choisie');
     Array.from(files).forEach((file) => {
       const att: Attachment = {
         id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -73,8 +83,13 @@ export function SubtaskDetailDialog({
         uploadedBy: currentUserId,
         uploadedAt: new Date().toISOString(),
       };
-      onAddDeliverable(subtask.id, att);
+      onAddDeliverable(targetId, att);
+      onAddComment(targetId, `Pièce jointe ajoutée : ${file.name}`);
+      if (targetId !== subtask.id) {
+        onAddComment(subtask.id, `Pièce jointe « ${file.name} » ajoutée à « ${destTitle} »`);
+      }
     });
+    setAttachToId('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -99,6 +114,7 @@ export function SubtaskDetailDialog({
       case 'todo': return 'in_progress';
       case 'in_progress': return 'review';
       case 'review': return 'done';
+      case 'cancelled': return 'todo';
       default: return null;
     }
   };
@@ -279,6 +295,24 @@ export function SubtaskDetailDialog({
                 )}
                 <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
               </div>
+
+              {canManage && allSubtasks.length > 1 && (
+                <div className="mb-3 flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ArrowUpRight className="h-3 w-3" /> Joindre à :
+                  </span>
+                  <Select value={attachToId || subtask.id} onValueChange={setAttachToId}>
+                    <SelectTrigger className="h-8 text-xs w-auto min-w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allSubtasks.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.id === subtask.id ? `${s.title} (cette tâche)` : s.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {deliverables.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground border-2 border-dashed rounded-xl">

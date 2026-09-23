@@ -372,7 +372,11 @@ export const mockProjects: Project[] = [
       { id: 'mod-2', projectId: 'p-1', subtaskId: 'st-1-4', target: 'subtask', requestedById: 'u-emp-3', requestedByName: 'Marco Rossi', field: 'description', oldValue: 'Créer l\'API REST (Laravel) et la base de données MySQL.', newValue: 'Créer l\'API REST (Laravel), la base de données MySQL et intégrer un système de cache Redis pour optimiser les performances.', reason: 'Les temps de réponse sur la gestion du catalogue dépassent les 2 secondes. Ajouter Redis améliorerait drastiquement les performances.', status: 'approved', reviewedById: 'u-admin-1', reviewNote: 'Demande justifiée, le cache Redis est une excellente idée pour les performances.', createdAt: '2026-08-28T14:00:00Z', reviewedAt: '2026-08-29T09:00:00Z' },
     ],
     taskRequests: [
-      { id: 'tr-1', projectId: 'p-1', clientId: 'u-cli-1', title: 'Ajouter une page FAQ', description: 'Ajouter une page FAQ responsive accessible depuis le pied de page du site, avec 8 questions/réponses pré-remplies.', priority: 'low', status: 'pending', reviewedById: null, reviewedAt: null, reviewNote: '', createdAt: '2026-09-14T09:00:00Z' },
+      { id: 'tr-1', projectId: 'p-1', clientId: 'u-cli-1', title: 'Ajouter une page FAQ', description: 'Ajouter une page FAQ responsive accessible depuis le pied de page du site, avec 8 questions/réponses pré-remplies.', priority: 'low', besoinDate: '2026-09-22T00:00:00Z', photoUrl: null, photoName: null, status: 'pending', reviewedById: null, reviewedAt: null, reviewNote: '', createdAt: '2026-09-14T09:00:00Z' },
+    ],
+    requetes: [
+      { id: 'rq-1', projectId: 'p-1', subtaskId: 'st-1-4', createdById: 'u-mgr-1', createdByName: 'Sophie Martin', content: 'Pouvez-vous nous envoyer le logo définitif de la marque en haute définition (format PNG) pour finaliser l\'intégration ?', status: 'pending', createdAt: '2026-09-19T09:30:00Z', respondedAt: null, response: null },
+      { id: 'rq-2', projectId: 'p-1', subtaskId: null, createdById: 'u-admin-1', createdByName: 'Hugo Lombard', content: 'Merci de transmettre les identifiants de la plateforme de test ainsi que l\'accès au compte Stripe sandbox.', status: 'answered', createdAt: '2026-09-10T14:00:00Z', respondedAt: '2026-09-11T10:15:00Z', response: { text: 'Voici les accès sandbox : voir la pièce jointe.', attachmentUrl: '#', attachmentName: 'acces_stripe_sandbox.txt', attachmentType: 'text/plain', at: '2026-09-11T10:15:00Z' } },
     ],
     clientMeeting: { date: '2026-06-10T10:00:00Z', note: 'Rapport de cadrage validé avec les 6 pages et le paiement Stripe.' },
     createdAt: '2026-05-20T08:00:00Z',
@@ -409,7 +413,10 @@ export const mockProjects: Project[] = [
       { id: 'mod-3', projectId: 'p-2', subtaskId: 'st-2-3', target: 'subtask', requestedById: 'u-emp-1', requestedByName: 'Thomas Dubois', field: 'title', oldValue: 'Intégration nouvelle UI', newValue: 'Intégration nouvelle UI + migration composants legacy', reason: 'L\'ancien site contient plus de composants legacy que prévu. Le titre devrait refléter le périmètre réel.', status: 'rejected', reviewedById: 'u-admin-1', reviewNote: 'Le changement de titre n\'est pas nécessaire. La description suffit à clarifier le périmètre.', createdAt: '2026-08-15T11:00:00Z', reviewedAt: '2026-08-16T08:00:00Z' },
     ],
     taskRequests: [
-      { id: 'tr-2', projectId: 'p-2', clientId: 'u-cli-2', title: 'Ajouter un formulaire de devis', description: 'Formulaire de devis en ligne (nom, email, descriptif du projet) avec envoi par email.', priority: 'medium', status: 'approved', reviewedById: 'u-admin-1', reviewedAt: '2026-08-20T10:00:00Z', reviewNote: 'Approuvé — une sous-tâche a été ajoutée au projet.', createdAt: '2026-08-19T09:00:00Z' },
+      { id: 'tr-2', projectId: 'p-2', clientId: 'u-cli-2', title: 'Ajouter un formulaire de devis', description: 'Formulaire de devis en ligne (nom, email, descriptif du projet) avec envoi par email.', priority: 'medium', besoinDate: '2026-08-25T00:00:00Z', photoUrl: null, photoName: null, status: 'approved', reviewedById: 'u-admin-1', reviewedAt: '2026-08-20T10:00:00Z', reviewNote: 'Approuvé — une sous-tâche a été ajoutée au projet.', createdAt: '2026-08-19T09:00:00Z' },
+    ],
+    requetes: [
+      { id: 'rq-3', projectId: 'p-2', subtaskId: 'st-2-1', createdById: 'u-mgr-2', createdByName: 'Nadia Benali', content: 'Pouvez-vous nous envoyer une photo du local commercial actuel afin d\'évaluer la refonte de la vitrine ?', status: 'pending', createdAt: '2026-09-18T08:00:00Z', respondedAt: null, response: null },
     ],
     clientMeeting: null,
     createdAt: '2026-06-25T08:00:00Z',
@@ -441,6 +448,7 @@ export const mockProjects: Project[] = [
     attachments: [makeAttachment('att-p3-1', 'brief_app_fitness.pdf', 'application/pdf', 'u-cli-3')],
     modifications: [],
     taskRequests: [],
+    requetes: [],
     clientMeeting: null,
     createdAt: '2026-08-20T08:00:00Z',
   },
@@ -471,6 +479,7 @@ export const mockProjects: Project[] = [
     attachments: [makeAttachment('att-p4-1', 'spec_analytics.pdf', 'application/pdf', 'u-cli-1')],
     modifications: [],
     taskRequests: [],
+    requetes: [],
     clientMeeting: null,
     createdAt: '2026-08-25T08:00:00Z',
   },
@@ -502,6 +511,7 @@ export const mockProjects: Project[] = [
     attachments: [],
     modifications: [],
     taskRequests: [],
+    requetes: [],
     clientMeeting: null,
     statusChangedAt: '2026-09-15T06:00:00Z',
     createdAt: '2026-08-10T08:00:00Z',
@@ -536,6 +546,7 @@ export const mockProjects: Project[] = [
     attachments: [],
     modifications: [],
     taskRequests: [],
+    requetes: [],
     clientMeeting: null,
     statusChangedAt: '2026-08-10T10:00:00Z',
     versions: [
@@ -572,6 +583,7 @@ export const mockProjects: Project[] = [
     attachments: [],
     modifications: [],
     taskRequests: [],
+    requetes: [],
     rejectionReason: 'Périmètre trop vague. Merci de détailler les applicatifs concernés et la méthodologie d\'audit.',
     clientMeeting: null,
     statusChangedAt: '2026-08-20T10:00:00Z',
@@ -591,4 +603,7 @@ export const mockNotifications: AppNotification[] = [
   { id: 'n-8', userId: 'u-cli-3', type: 'project_rejected', title: 'Projet rejeté', message: 'Votre projet « Refonte Logo & Identité — UrbanVibes » a été rejeté. Consultez le motif.', projectId: 'p-5', read: false, createdAt: '2026-08-12T10:00:00Z' },
   { id: 'n-9', userId: 'u-mgr-2', type: 'subtask_assigned', title: 'Projet assigné', message: 'Le projet « Refonte Site Vitrine EcoShop » vous a été assigné.', projectId: 'p-2', read: true, createdAt: '2026-06-26T10:00:00Z' },
   { id: 'n-10', userId: 'u-admin-1', type: 'task_requested', title: 'Demande de tâche client', message: '« Plateforme E-commerce TechStart » : le client demande l\'ajout d\'une page FAQ.', projectId: 'p-1', read: false, createdAt: '2026-09-14T09:00:01Z' },
+  { id: 'n-11', userId: 'u-cli-1', type: 'requete_created', title: 'Nouvelle requête', message: 'Sophie Martin vous demande : « Pouvez-vous nous envoyer le logo définitif de la marque en haute définition ? » (projet « Plateforme E-commerce TechStart »).', projectId: 'p-1', read: false, createdAt: '2026-09-19T09:30:00Z' },
+  { id: 'n-12', userId: 'u-admin-1', type: 'requete_answered', title: 'Requête répondue', message: 'Le client a répondu à votre requête sur « Plateforme E-commerce TechStart » : « Voici les accès sandbox : voir la pièce jointe. »', projectId: 'p-1', read: false, createdAt: '2026-09-11T10:15:00Z' },
+  { id: 'n-13', userId: 'u-cli-2', type: 'requete_created', title: 'Nouvelle requête', message: 'Nadia Benali vous demande : « Pouvez-vous nous envoyer une photo du local commercial actuel ? » (projet « Refonte Site Vitrine EcoShop »).', projectId: 'p-2', read: false, createdAt: '2026-09-18T08:00:00Z' },
 ];
