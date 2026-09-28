@@ -14,7 +14,11 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://images.unsplash.com https://api.dicebear.com",
       "font-src 'self' data:",
+<<<<<<< HEAD
       "connect-src 'self' ws: wss:",
+=======
+      "connect-src 'self' ws: wss: http://localhost:8000 http://localhost:8001",
+>>>>>>> 8b15cfd (test Back_end parte Projet)
       "media-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
