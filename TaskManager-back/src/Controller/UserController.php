@@ -12,12 +12,22 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted('ROLE_ADMIN')]
 class UserController extends AbstractController
 {
+    /**
+     * Consultation de l'annuaire : réservée à l'admin et au chef de projet
+     * (le chef de projet doit voir tous les membres de l'entreprise sur sa page Équipe).
+     */
     #[Route('/api/users', name: 'api_users_list', methods: ['GET'])]
     public function list(EntityManagerInterface $em): JsonResponse
     {
+        if (
+            !$this->isGranted('ROLE_ADMIN')
+            && !$this->isGranted('ROLE_CHEF_DE_PROJET')
+        ) {
+            return $this->json(['message' => 'Non autorisé.'], 403);
+        }
+
         $users = $em->getRepository(User::class)->findAll();
         $data = array_map(function (User $u) {
             $roles = $u->getRoles();
@@ -50,6 +60,7 @@ class UserController extends AbstractController
     }
 
     #[Route('/api/users', name: 'api_users_create', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function create(
         Request $request,
         EntityManagerInterface $em,
@@ -158,6 +169,7 @@ class UserController extends AbstractController
     }
 
     #[Route('/api/users/{id}', name: 'api_users_update', methods: ['PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function update(
         int $id,
         Request $request,

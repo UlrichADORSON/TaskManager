@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Users, Mail, Phone, UserPlus, Upload, X, Building2, MapPin, KeyRound, ArrowUpRight, Search, Briefcase } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { toast } from '@/hooks/use-toast';
 import { AppShell } from '@/components/shared/app-shell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

@@ -8,10 +8,7 @@ import type {
   Requete, RequeteStatus, RequeteResponse,
 } from '@/types';
 import { mockUsers, mockProjects, mockNotifications } from '@/lib/mock-data';
-<<<<<<< HEAD
-=======
 import { projectApi, mapApiProject, loginApi, getApiToken, clearApiToken } from '@/lib/project-api';
->>>>>>> 8b15cfd (test Back_end parte Projet)
 
 interface SubmitProjectData {
   title: string;
@@ -143,10 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
-<<<<<<< HEAD
-=======
   const [apiToken, setApiToken] = useState<string | null>(() => getApiToken());
->>>>>>> 8b15cfd (test Back_end parte Projet)
 
   const [specialties, setSpecialties] = useState<string[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_SPECIALTIES;
@@ -235,12 +229,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-<<<<<<< HEAD
-=======
     loginApi(email.trim(), password)
       .then(({ token }) => setApiToken(token))
       .catch(() => { /* local/demo account may not exist in Symfony yet */ });
->>>>>>> 8b15cfd (test Back_end parte Projet)
     return true;
   }, [users]);
 
@@ -250,11 +241,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUsers((prev) => prev.map((u) => u.id === currentUser.id ? { ...u, active: false } : u));
     }
     setCurrentUser(null);
-<<<<<<< HEAD
-=======
     setApiToken(null);
     clearApiToken();
->>>>>>> 8b15cfd (test Back_end parte Projet)
     try {
       window.localStorage.removeItem(SESSION_KEY);
     } catch {
@@ -262,8 +250,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser]);
 
-<<<<<<< HEAD
-=======
   // ---- Symfony Projects backend hydration
   useEffect(() => {
     if (!apiToken) return;
@@ -283,7 +269,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [apiToken, users]);
 
->>>>>>> 8b15cfd (test Back_end parte Projet)
   // ---- Project actions
   const submitProject: AppState['submitProject'] = useCallback((data) => {
     const submittedByAdmin = currentUser?.role === 'admin';
@@ -317,30 +302,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setProjects((prev) => [newProject, ...prev]);
-<<<<<<< HEAD
-=======
     if (apiToken) {
       projectApi.create(data)
         .then((created) => setProjects((prev) => [mapApiProject(created), ...prev.filter((p) => p.id !== newProject.id)]))
         .catch(() => { /* optimistic local fallback remains visible */ });
     }
->>>>>>> 8b15cfd (test Back_end parte Projet)
     if (!submittedByAdmin) {
       setNotifications((prev) => [
         { id: `n-${Date.now()}`, userId: 'u-admin-1', type: 'project_submitted', title: 'Nouveau projet soumis', message: `« ${data.title} » attend validation.`, projectId: newProject.id, read: false, createdAt: new Date().toISOString() },
         ...prev,
       ]);
     }
-<<<<<<< HEAD
-  }, [currentUser]);
-
-  const validateProject: AppState['validateProject'] = useCallback((projectId) => {
-=======
   }, [currentUser, apiToken]);
 
   const validateProject: AppState['validateProject'] = useCallback((projectId) => {
     if (apiToken) projectApi.validate(projectId).catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId ? { ...p, status: 'validated' as ProjectStatus } : p
     ));
@@ -351,16 +327,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
     }
-<<<<<<< HEAD
-  }, [projects]);
-
-  const revertProjectValidation: AppState['revertProjectValidation'] = useCallback((projectId) => {
-=======
   }, [projects, apiToken]);
 
   const revertProjectValidation: AppState['revertProjectValidation'] = useCallback((projectId) => {
     if (apiToken) projectApi.updateStatus(projectId, 'pending').catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId ? { ...p, status: 'pending' as ProjectStatus, statusChangedAt: null } : p
     ));
@@ -371,16 +341,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
     }
-<<<<<<< HEAD
-  }, [projects]);
-
-  const rejectProject: AppState['rejectProject'] = useCallback((projectId, reason) => {
-=======
   }, [projects, apiToken]);
 
   const rejectProject: AppState['rejectProject'] = useCallback((projectId, reason) => {
     if (apiToken) projectApi.reject(projectId, reason).catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId ? { ...p, status: 'rejected' as ProjectStatus, rejectionReason: reason, statusChangedAt: new Date().toISOString() } : p
     ));
@@ -391,16 +355,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
     }
-<<<<<<< HEAD
-  }, [projects]);
-
-  const updateProjectStatus: AppState['updateProjectStatus'] = useCallback((projectId, status) => {
-=======
   }, [projects, apiToken]);
 
   const updateProjectStatus: AppState['updateProjectStatus'] = useCallback((projectId, status) => {
     if (apiToken) projectApi.updateStatus(projectId, status).catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
         ? {
@@ -427,11 +385,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         projectId,
       });
     }
-<<<<<<< HEAD
-  }, [projects]);
-
-  const assignManager: AppState['assignManager'] = useCallback((projectId, managerId) => {
-=======
   }, [projects, apiToken]);
 
   const assignManager: AppState['assignManager'] = useCallback((projectId, managerId) => {
@@ -439,7 +392,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const manager = users.find((u) => u.id === managerId);
       projectApi.assign(projectId, manager?.email || managerId).catch(() => {});
     }
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
         ? {
@@ -454,12 +406,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       { id: `n-${Date.now()}`, userId: managerId, type: 'subtask_assigned', title: 'Projet assigné', message: `Un nouveau projet vous a été assigné.`, projectId, read: false, createdAt: new Date().toISOString() },
       ...prev,
     ]);
-<<<<<<< HEAD
-  }, []);
-
-  // ---- Member management
-  const addProjectMember: AppState['addProjectMember'] = useCallback((projectId, data) => {
-=======
   }, [apiToken, users]);
 
   // ---- Member management
@@ -468,7 +414,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const member = users.find((u) => u.id === data.userId);
       projectApi.addMember(projectId, { ...data, userId: member?.email || data.userId }).catch(() => {});
     }
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) => {
       if (p.id !== projectId) return p;
       if (p.members.some((m) => m.userId === data.userId)) return p;
@@ -481,16 +426,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       { id: `n-${Date.now()}`, userId: data.userId, type: 'member_added', title: 'Ajouté à un projet', message: `Vous avez été ajouté à un projet.`, projectId, read: false, createdAt: new Date().toISOString() },
       ...prev,
     ]);
-<<<<<<< HEAD
-  }, []);
-
-  const removeProjectMember: AppState['removeProjectMember'] = useCallback((projectId, userId) => {
-=======
   }, [apiToken, users]);
 
   const removeProjectMember: AppState['removeProjectMember'] = useCallback((projectId, userId) => {
     if (apiToken) projectApi.removeMember(projectId, userId).catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     setProjects((prev) => prev.map((p) =>
       p.id === projectId
         ? { ...p, members: p.members.filter((m) => m.userId !== userId) }
@@ -1113,10 +1052,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Client meeting (post-framing report)
   const scheduleClientMeeting: AppState['scheduleClientMeeting'] = useCallback((projectId, data) => {
-<<<<<<< HEAD
-=======
     if (apiToken) projectApi.createEvent(projectId, { title: 'Rendez-vous client — rapport de cadrage', date: data.date, type: 'rendez_vous', description: data.note }).catch(() => {});
->>>>>>> 8b15cfd (test Back_end parte Projet)
     const nowEventId = `ev-${Date.now()}`;
     setProjects((prev) => prev.map((p) => {
       if (p.id !== projectId) return p;
@@ -1143,11 +1079,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ];
     });
-<<<<<<< HEAD
-  }, [projects]);
-=======
   }, [projects, apiToken]);
->>>>>>> 8b15cfd (test Back_end parte Projet)
 
   // ---- Employee / member management
   const addEmployee: AppState['addEmployee'] = useCallback((data) => {
